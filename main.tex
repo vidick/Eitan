@@ -1,0 +1,926 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+% I need an actual name for this
+
+\usepackage[affil-it]{authblk}
+\usepackage{blindtext}
+\title{Draft: Certified Randomness from a Computational Bell Test} 
+
+
+\affil[*]{Weizmann Institute of Science, Israel}
+\date{}
+\usepackage{braket}
+% \usepackage[letterpaper]{geometry}
+% \usepackage[T1]{fontenc} 
+% \usepackage{booktabs} 
+\usepackage{ntheorem}
+\usepackage{amssymb}
+\newtheorem{claim}{Claim}
+\newtheorem{proof}{Proof}
+\newtheorem{conjecture}{Conjecture}
+\newtheorem{definition}{Definition}
+\newtheorem{corollary}{Corollary}
+\newtheorem{protocol}{Protocol}
+
+\newtheorem{thm}{Theorem}
+\newtheorem{lem}[thm]{Lemma}
+\newtheorem{remark}{Remark}
+\usepackage[autostyle]{csquotes}
+\usepackage{libertine}
+\usepackage[libertine]{newtxmath}
+\usepackage[top=2cm, bottom=2cm]{geometry}
+\usepackage[
+    backend=biber,
+    style=apa,
+    sortlocale=de_DE,
+    natbib=true,
+    url=false, 
+    doi=true,
+    eprint=false
+]{biblatex}
+% \usepackage[style=numeric,giveninits=true]{biblatex}
+\usepackage{amsmath}
+\usepackage{lipsum,pdflscape}
+\usepackage{float}
+\usepackage{graphicx} % \scalebox
+\usepackage{environ}
+ \usepackage{mathtools}
+ \usepackage{hyperref}  
+ \usepackage{qcircuit}
+\bibliography{refs}
+% \setlength{\parskip}{8pt}
+\usepackage{setspace}
+% \usepackage{natbib}
+\begin{document}
+
+\onehalfspacing
+\maketitle
+\begin{abstract}
+We introduce a new protocol for verifying quantum advantage based on the work of \cite{KCVY2022}. We show how this protocol can be used for certifiable randomness. Previous works have shown certifiable randomness based on the hardness of Learning with Errors and Adaptive Hardcore Bits (\cite{https://doi.org/10.48550/arxiv.1804.00640}; \cite{regev2009lattices}). This work only uses an assumption about the existence of post-quantum trapdoor claw-free functions. We also show some impossibility results about the prover of the protocol. 
+\end{abstract}
+\tableofcontents
+\section{Introduction}
+% TODO: Add introduction...
+
+% Open Questions: 
+% \begin{itemize}
+%     \item Less rounds.
+%     \item Randomness Accumulation.
+%     \item Rigidity of quantum prover.
+%     \item Overcoming engineering challenges of creating in practice, a superposition of claws.
+% \end{itemize}
+\section{Preliminaries}
+\begin{definition}
+For $x,y\in\{0,1\}^{n}$ we define their bitwise inner product to be
+\begin{align*}x\cdot y = \sum_{i=1}^{n}{x_{i}\cdot y_{i}} \mod 2\end{align*} 
+
+\end{definition}
+\begin{definition}
+Let $n$ be a security parameter, $K$ a set of keys, and $X_{k}$ and $Y_{k}$ finite sets for each $k\in K$. A family of functions 
+\begin{align*}\mathcal{F}=\{f_{k}:X_{k}\to Y_{k}\}_{k\in K}\end{align*} 
+is called a trapdoor claw free (TCF) family if the following conditions hold:
+\begin{enumerate}
+    \item \textbf{Efficient Function Generation.} There exists an efficient probabilistic algorithm $\mathrm{Gen}$ which generates a key $k\in K$ and the associated trapdoor $t_{k}$:
+    \begin{align*}(k,t_{k})\leftarrow \mathrm{Gen}(1^{n})\end{align*} 
+    \item \textbf{Trapdoor Injective Pair.} For all keys $k\in K$, the following conditions hold:
+    \begin{enumerate}
+        \item Injective pair: Consider the set $R_{k}$ of all tuples $(x_{0}, x_{1})$ such that $f_{k}(x_{0})=f_{k}(x_{1})$. Let $X_{k}'\subseteq X_{k}$ be the set of values $x$ which appear in the elements of $R_{k}$. For all $x \in X_{k}'$, $x$ appears in exactly one element of $R_{k}$; furthermore, $\lim_{n\to \infty}{|X_{k}'|/|X_{k}|=1}$
+        \item Trapdoor: There exists an efficient deterministic algorithm $T_{k}$ such that for all $y\in Y_{k}$ and $(x_{0},x_{1})$ such that $f_{k}(x_{0})=f_{k}(x_{1})=y$, $T(t_{k},y)=(x_{0},x_{1})$. We assume there exists some ordering on the preimages in order to define $x_{0}$ and $x_{1}$ uniquely.
+    \end{enumerate}
+    \item \textbf{Claw-free.} For any non-uniform probabilistic polynomial time classical Turing machine $\mathcal{A}$, there exists a negligble function $\epsilon(\cdot)$ such that
+    \begin{align*}\Pr[f_{k}(x_{0})=f_{k}(x_{1})\wedge x_{0}\neq x_{1} | (x_{0},x_{1})\leftarrow \mathcal{A}(k)]<\epsilon(n)\end{align*}  where the probability is over both the choice of $k$ and the random coins of $\mathcal{A}$
+    \item \textbf{Efficient Superposition.} There exists an efficient quantum circuit that on input of a key $k$ prepares the state
+    \begin{align*}\frac{1}{\sqrt{|X_{k}|}}\sum_{x\in X_{k}}{\ket{x} \ket{f_{k}(x)}}\end{align*} 
+\end{enumerate}
+\end{definition}
+The Goldreich-Levin Theorem provides an efficient randomized polynomial-time algorithm for Hadamard code list-decoding \cite{10.1145/73007.73010}.
+\begin{thm}[Goldreich-Levin] \label{gl}
+There exists a $\mathrm{PPT}$ algorithm that given $f:\{0,1\}^{n}\mapsto\{-1,+1\}$ and a non-negligible function $\mu(n)$, runs in $\mathrm{poly}(n)$ and outputs a list $L$ such that for all $a\in\{0,1\}^{n}$ \begin{align}\mathrm{Pr}_{x\overset{\$}{\leftarrow}\{0,1\}^{n}}\left[(-1)^{a\cdot x}=f(x)\right]\geq\frac{1}{2}+\mu(n)\end{align} 
+then $\Pr[a\in L]\geq\frac{1}{2}$, where the probability is taken over the random coins of the algorithm.
+\end{thm}
+
+% \subsection{Inner product }
+% % We state and prove a result about quantum algorithms for the Quantum Goldreich-Levin Problem. We modify it's definition and prove that the algorithm as shown in \cite{} still works.
+% \begin{definition}
+% A \emph{quantum inner product} query (with bias $\varepsilon$) is a unitary transformation $U_{\mathrm{IP}}$ together with an auxilliary $m$-qubit quantum state $\ket{\psi}$ on $n+m+t$ qubits, or its inverse $U_{\mathrm{IP}}^{\dagger}$ such that $U_{\mathrm{IP}}$ satisfies the following two properties:
+% \begin{enumerate}
+%     \item If $x\in\{0,1\}^{n}$ is chosen randomly according to the uniform distribution and the last qubit of $U_{\mathrm{IP}}\ket{x}\ket{\psi}\ket{0^{t}}$ is measured, yield the value $w\in\{0,1\}$, then $\Pr[w=a\cdot x]\geq \frac{1}{2} + \varepsilon$.
+%     \item For any $x\in\{0,1\}^{n}$ and $y\in\{0,1\}^{t}$, the state of the first $n$ qubits of $U_{\mathrm{IP}}\ket{x}\ket{\psi}\ket{y}$ is $x$.
+% \end{enumerate}
+% We write $\ket{x_{1},\dots,x_{n},\psi,y_{1},\dots,y_{t}}$ as shortened notation for $\ket{x_{1},\dots,x_{n}}\otimes \ket{\psi}\otimes \ket{y_{1},\dots,y_{t}}$
+% \end{definition}
+% \begin{thm} \label{qgl}
+% There exists a quantum algorithm solving the Quantum Goldreich-Levin problem with probability greater than or equal to $4\varepsilon^{2}$ using a $U_{\mathrm{IP}}$ query and a $U_{\mathrm{IP}}^{\dagger}$ query. The number of auxilliary qubit operation used by this procedure is $O(1)$.
+% \end{thm} \textbf{Proof of theorem \ref{qgl}. (Adapted from \cite{})} 
+% Since $U_{\mathrm{IP}}$ applied to $\ket{x}\ket{\psi}\ket{y}$ has no net effect on its first $n$ qubits, for each $x\in \{0,1\}^{n}$,
+% \begin{align}U_{\mathrm{IP}}\ket{x}\ket{\psi}\ket{0^{t}} = \ket{x}\left(\alpha_{x}\ket{v_{x}}\ket{a\cdot x} + \beta_{x}\ket{w_{x}}\ket{\overline{a\cdot x}}\right)\end{align}  where $\alpha_{x}$ and $\beta_{x}$ are nonnegative real number, and $\ket{v_{x}}$ and $\ket{w_{x}}$ are $m+t-1$ qubit quantum states. If the last qubit of $U_{\mathrm{IP}}\ket{x}\ket{\psi}\ket{0^{t}}$ is measured then the result is: $a\cdot x$ with probability $\alpha_{x}^{2}$, and $\overline{a\cdot x}$ with probability $\beta_{x}^{2}$. Therefore, since, for a random uniformly distributed $x\in\{0,1\}^{n}$, measuring the last qubit of $U_{\mathrm{IP}}\ket{x}\ket{\psi}\ket{0^{t}}$ yields $a\cdot x$ with probability at least $\frac{1}{2}+\varepsilon$, it follows that \begin{align*}
+%     \frac{1}{2^{n}}\sum_{x\in\{0,1\}^{n}}{\alpha_{x}^{2}}\geq \frac{1}{2}+\varepsilon
+% \end{align*}
+
+% \begin{align*}
+%     \frac{1}{2^{n}}\sum_{x\in\{0,1\}^{n}}{\beta_{x}^{2}}\leq \frac{1}{2}-\varepsilon
+% \end{align*} We will begin by showing that \begin{align}\bra{a,\psi,0^{t},1}C\ket{0^{n},\psi,0^{t},0} \geq 2\varepsilon\end{align}  which intuitively can be viewed as an indication of progress that $C$ makes towards finding the string $a$. To establish Eq. (), note that the operation $C$ can be decomposed into the following five operations:
+% \begin{enumerate}
+%     \item Operation $C_{1}$: Apply $H$ to each of the first $n$ qubits, and a $\mathrm{NOT}$ operation to the last qubit.
+%     \item Operation $C_{2}$: Apply $U_{\mathrm{IP}}$ to the first $n+m+t$ qubits.
+%     \item Operation $C_{3}$; Apply a controlled-$Z$ to the last two qubits.
+%     \item Operation $C_{4}$: Apply $U_{\mathrm{IP}}^{\dagger}$ to the first $n+m+t$ qubits.
+%     \item Operation $C_{5}$: Apply $H$ to each of the first $n$ qubits.
+% \end{enumerate}
+% Since $\bra{a,\psi,0^{t},1}C\ket{0^{n},\psi,0^{t},0}=\bra{a,\psi,0^{t},1}C_{5}C_{4}C_{3}C_{2}C_{1}\ket{0^{n},\psi,0^{m},0}$, the quantity $\bra{a,\psi,0^{t},1}C\ket{0^{n},\psi,0^{m}}$ is the inner product of the state $C_{3}C_{2}C_{1}\ket{0^{n}}\ket{\psi}\ket{0^{t}}\ket{0}$ and the state $C_{4}^{\dagger}C_{5}^{\dagger}\ket{a}\ket{\psi}\ket{0^{t}}\ket{1}$. These states are 
+% \begin{align} 
+%     C_{3}C_{2}C_{1}\ket{0^{n}}\ket{\psi}\ket{0^{t}}\ket{0}&= C_{3}C_{2}\frac{1}{\sqrt{2^{n}}}\sum_{x\in\{0,1\}^{n}}\ket{x}\ket{\psi}\ket{0^{t}}\ket{1}\\&=C_{3}\frac{1}{\sqrt{2^{n}}}\sum_{x\in\{0,1\}^{n}}{\ket{x}\left(\alpha_{x}\ket{v_{x}}\ket{a\cdot x} + \beta_{x}\ket{w_{x}}\ket{\overline{a\cdot x}}\right)}\ket{1}\\
+%     &=\frac{1}{\sqrt{2^{n}}}\sum_{x\in\{0,1\}^{n}}{\ket{x}\left(\alpha_{x}(-1)^{a\cdot x}\ket{v_{x}}\ket{a\cdot x}+\beta_{x}(-1)^{\overline{a\cdot x}}\ket{w_{x}}\ket{\overline{a\cdot x}}\right)}\ket{1}\\
+%     &=\frac{1}{\sqrt{2^{n}}}\sum_{x\in\{0,1\}^{n}}{(-1)^{a\cdot x}\ket{x}\left(\alpha_{x}\ket{v_{x}}\ket{a\cdot x}-\beta_{x}\ket{w_{x}}\ket{\overline{a\cdot x}}\right)}\ket{1}
+% \end{align}
+% and
+% \begin{align} 
+%     C_{4}^{\dagger}C_{5}^{\dagger}\ket{a}\ket{\psi}\ket{0^{t}}\ket{1}&=C_{4}^{\dagger}\frac{1}{\sqrt{2^{n}}}\sum_{x\in\{0,1\}^{n}}{(-1)^{a\cdot x}\ket{x}\ket{\psi}\ket{0^{t}}\ket{1}}\\
+%     &=\frac{1}{\sqrt{2^{n}}}\sum_{x\in\{0,1\}^{n}}{(-1)^{a\cdot x}\ket{x}\left(\alpha_{x}\ket{v_{x}}\ket{a\cdot x} + \beta_{x}\ket{w_{x}}\ket{\overline{a\cdot x}}\right)\ket{1}}
+% \end{align}
+% It follows from Eq. (?) and Eq. (?) that
+% \begin{align}
+%     \bra{a,\psi,0^{t},1}C\ket{0^{n},\psi,0^{t},0} &= \frac{1}{2^{n}}\sum_{x\in\{0,1\}^{n}}{\alpha_{x}^{2}-\beta_{x}^{2}}\\
+%     &\geq \left(\frac{1}{2}+\varepsilon\right) - \left(\frac{1}{2}-\varepsilon\right)\\
+%     &=2\varepsilon
+% \end{align}
+% This equation implies that if $C$ is executed on input $\ket{0^{n}}\ket{\psi}\ket{0^{t},0}$ and the result is measured in the computational basis, then the first $n$ bits of the result will be $a$ with a probability at least \begin{align}\left|\bra{a,\psi,0^{t},1}C\ket{0^{n},\psi,0^{t},0}\right|^{2}\geq 4\varepsilon^{2}\end{align} 
+\subsection{Mathematical Preliminaries}
+\begin{lem}[Jordan's Lemma]\label{jordan}
+For any two binary projections $\Pi_{0}, \Pi_{1}$ acting on $\mathcal{H}$, there exists an orthogonal decomposition $\mathcal{H}=\oplus_{i}S_{i}$ of the Hilbert space such that each $S_{i}$ is a 1-dimensional or 2-dimensional subspace stable by $\Pi_{0}$ and $\Pi_{1}$. Furthermore, whenever $S_{i}$ is 2-dimensional there is a basis for it in which $\Pi_{0}$ and $\Pi_{1}$ take the form
+\begin{align}\Pi_{0}=\begin{pmatrix}1 & 0\\0 & 0\end{pmatrix},\qquad \Pi_{1}=\begin{pmatrix}\cos^{2}(\theta_{i}) & \cos(\theta_{i})\sin(\theta_{i})\\ \cos(\theta_{i})\sin(\theta_{i})& \cos^{2}(\theta_{i})\end{pmatrix}\end{align}
+For some $\theta_{i}\in [0,2\pi)$.
+\end{lem}
+\textbf{Proof.} Consider the matrix $\Pi_{0}+\Pi_{1}$, it is symmetric and therefore diagonizable. Consider its eigenvalue $\textbf{v}$ with eigenvalue $\lambda$. If $\textbf{v}$ is an eigenvalue of $\Pi_{0}$ with eigenvalue $\eta$, then $\Pi_{1}\textbf{v} = (\Pi_{0}+\Pi_{1})\textbf{v} - \Pi_{0}\textbf{v} = (\lambda - \eta)\textbf{v}$, therefore $\textbf{v}$ is an eigenvalue of $\Pi_{0}$ and $\Pi_{1}$ and the 1-dimensional subspace spanned by it is stable under $\Pi_{0}$ and $\Pi_{1}$. Otherwise, $\textbf{v}$ is not an eigenvalue of $\Pi_{0}$ and therefore $\{\textbf{v}, \Pi_{0}\textbf{v}\}$ form a basis for a two-dimensional subspace of $\mathcal{H}$, $S=\mathrm{span}\{\textbf{v}, \Pi_{0}\textbf{v}\}$. Since \begin{align}
+    \Pi_{1}\textbf{v} = (\Pi_{0} + \Pi_{1})\textbf{v} - \Pi_{0}\textbf{v} = \lambda \textbf{v} - \Pi_{0}\textbf{v}
+\end{align} $\Pi_{1}\textbf{v} \in S$. \begin{align}
+    \Pi_{1}\Pi_{0}\textbf{v} = \Pi_{1}(\lambda\textbf{v} - \Pi_{1}\textbf{v}) = \lambda \Pi_{1}\textbf{v} - \Pi_{1}\textbf{v} = (\lambda - 1)\Pi_{1}\textbf{v} \in S
+\end{align}
+Hence $S$ is stabilized by $\Pi_{0}$ and $\Pi_{1}$. Consider \begin{align}\textbf{u} &= \frac{\textbf{v} + \Pi_{0}\textbf{v}}{\lVert \textbf{v} + \Pi_{0}\textbf{v} \rVert}\\
+\textbf{u}^{\perp} &= \frac{\textbf{v} - \Pi_{0}\textbf{v}}{\lVert \textbf{v} - \Pi_{0}\textbf{v}\rVert}
+\end{align} $\Pi_{0}\textbf{u} = \textbf{u}$ and $\Pi_{0}\textbf{u}^{\perp}=0$. In the $\textbf{u}$, $\textbf{u}^{\perp}$ basis \begin{align}
+    \Pi_{0}=\begin{pmatrix}1 & 0\\0 & 0\end{pmatrix}
+\end{align} in the same manner we can define \begin{align}\textbf{w} &= \frac{\textbf{v} + \Pi_{1}\textbf{v}}{\lVert \textbf{v} + \Pi_{1}\textbf{v} \rVert}\\
+\textbf{w}^{\perp} &= \frac{\textbf{v} - \Pi_{1}\textbf{v}}{\lVert \textbf{v} - \Pi_{1}\textbf{v}\rVert}
+\end{align} In the $\textbf{w}$, $\textbf{w}^{\perp}$ basis \begin{align}
+    \Pi_{1} = \begin{pmatrix}1 & 0\\0 & 0\end{pmatrix}
+\end{align} Let $\theta$ be the angle between \textbf{w} and $\textbf{u}$. Then the matrix \begin{align}
+    R(\theta) = \begin{pmatrix}\cos(\theta) & -\sin(\theta)\\\sin(\theta) & \cos(\theta)\end{pmatrix}
+\end{align} transform $\textbf{w}$ into $\textbf{u}$ and $\textbf{w}^{\perp}$ into $\textbf{u}^{\perp}$. In the $\textbf{u}$, $\textbf{u}^{\perp}$ basis, \begin{align}
+    \Pi_{1} = R(\theta)\begin{pmatrix}1 & 0\\0 & 0\end{pmatrix}R(-\theta) = \begin{pmatrix}\cos^{2}(\theta) & \cos(\theta)\sin(\theta)\\\cos(\theta)\sin(\theta) & \sin^{2}(\theta)\end{pmatrix}.
+\end{align} We can enumerate all subspaces $S_{i}$ and define $\theta_{i}$ in the same manner for all $i$.
+\begin{lem}[Reverse Markov Inequality] \label{markovlemma}
+Let $X$ be a random variable taking values in the range $[0,1]$. Suppose $\mathbb{E}[X]\geq a$ and $b\in [0,1)$, then $\Pr(X\geq b)\geq \frac{a-b}{1-b}$
+\end{lem} \textbf{Proof.} Using the law of total expectation,
+\begin{align} 
+    \mathbb{E}[X] &= \mathbb{E}[X|X\geq b]\cdot \Pr(X\geq b) + \mathbb{E}[X|X < b]\cdot \Pr(X < b)\\
+    &= (\mathbb{E}[X|X\geq b] - \mathbb{E}[X|X<b])\cdot \Pr(X\geq b) + \mathbb{E}[X|X<b]
+\end{align} By simple algebra \begin{align}
+    \Pr(X\geq b) &= \frac{\mathbb{E}[X] - \mathbb{E}[X|X<b]}{\mathbb{E}[X|X\geq b] - \mathbb{E}[X|X<b]} \geq \frac{a-b}{1-b}
+\end{align}
+
+\begin{remark}
+An analogous statement can be proven in the case that $\mathbb{E}[X]\leq a$. In this case, $\mathbb{E}[1-X]\geq 1-a$.
+\begin{align}
+    \Pr(X\leq b) = \Pr(1-X\geq 1-b) \geq \frac{b-a}{b}
+\end{align}
+\end{remark}
+
+% \subsection{Quantum Amplitude Amplification}
+% We use a technique pioneered by Gilles Brassard and Peter Hoyer (add citation).
+
+% \begin{definition}
+% A quantum equivalence query is a unitary operation $U_{\mathrm{EQ}}$ along with a set $S$ such that, for all $x\in\{0,1\}^{n}$ and $b\in\{0,1\}$,
+% \begin{align}
+%   U_{\mathrm{EQ}}\ket{x}\ket{b} = \left.
+%   \begin{cases}
+%     \ket{x}\ket{\bar{b}}, & \text{for } x\in S \\
+%     \ket{x}\ket{b}, & \text{for }x\notin S \\
+%   \end{cases}
+%   \right\}
+% \end{align}
+% \end{definition}
+
+% \begin{thm} \label{qaa}
+% Assuming $U_{\mathrm{IP}}$ performs no measurements, then there exists a circuit $\hat{C}$ such that 
+% \begin{align}\bra{s,\psi,0^{t},1}\hat{C}\ket{0^{n},\psi,0^{t},0}\geq 1-\eta(n)\end{align} for $s\in S$ using ... queries for any $\eta(n)$
+% \end{thm}
+% \textbf{Proof of theorem \ref{qaa}.}
+% Let $\mathcal{Q} = -CU_{0}C^{\dagger}C^{\dagger}U_{\mathrm{EQ}}$ we define $C_{k} =\mathcal{Q}^{k}C$ 
+\section{Description of the new protocol}
+% TODO: Add sketch
+\begin{protocol}\label{protocol}
+The protocol consists of three rounds of interaction between the prover (quantum) and verifier (classical). 
+
+Let $n$ be a security parameter. The quantum states are normalized, but for simplicity are written as non-normalized. The protocol is defined as follows:
+
+\begin{enumerate}
+    \item (\emph{verifier}) samples $(k,t_{k})\leftarrow \mathrm{Gen}(1^{n})$ and sends $k$ to the prover.
+    \item (\emph{prover}) generates a state $\sum_{x\in X_{k}}{\ket{x}_{\mathrm{x}} \ket{f_{k}(x)}_{\mathrm{y}}}$
+    \item (\emph{prover}) measures the $\mathrm{y}$ register, yielding a bitstring $y$. The state is now $(\ket{x_{0}}+\ket{x_{1}})_{\mathrm{x}}\ket{y}_{\mathrm{y}}$; $\mathrm{y}$ register can be discarded. The prover sends $y$ to the verifier.
+    \item (\emph{verifier}) uses trapdoor $t_{k}$ and computes $x_{0}$ and $x_{1}$.
+    \item (\emph{verifier}) chooses a random bitstring $r$ and sends it to the prover.
+    \item (\emph{prover}) adds one ancilla $\mathrm{b}$; uses $\mathrm{CNOT}$ to compute $\ket{r\cdot x_{0}}\ket{x_{0}}_{\mathrm{x}}+\ket{r\cdot x_{1}}\ket{x_{1}}_{\mathrm{x}}$.
+    \item (\emph{prover}) measures the $\mathrm{x}$ register in the Hadamard basis, yielding a string $d$. Discard $\mathrm{x}$, state is now $\ket{\psi}_{\mathrm{b}}\in\{\ket{0},\ket{1},\ket{+},\ket{-}\}$. The prover sends $d$ to the verifier. \label{hb}
+    \item (\emph{verifier}) determines $\ket{\psi}_{\mathrm{b}}$ using $r,x_{0},x_{1},d$.
+    \item (\emph{verifier}) chooses a random $m\in \{0, 1\}$ and sends it to the prover.
+    \item (\emph{prover}) measures ancilla $\mathrm{b}$ in the rotated basis \begin{align*}\left\{\cos\left(\frac{(-1)^{m}\pi}{8}\right)\ket{0}+\sin\left(\frac{(-1)^{m}\pi}{8}\right)\ket{1}, \cos\left(\frac{(-1)^{m}\pi}{8}\right)\ket{1}-\sin\left(\frac{(-1)^{m}\pi}{8}\right)\ket{0}\right\}\end{align*}  yielding a bit $b$. The prover sends $c=(-1)^{b}$ to the verifier.
+    \item (\emph{verifier}) returns $\mathrm{Accept}$ if $c$ was likely given $\ket{\psi}_{b}$. 
+\end{enumerate}
+\end{protocol}
+
+\subsection{Correctness}
+We are assuming that $X_{k}$ can be represented as a set of $n$-bit strings ($X_{k}\subseteq\{0,1\}^{n}$).
+
+\begin{thm}[Correctness]
+An error-free quantum device honestly following the interactive protocol will cause the verifier to return $\mathrm{Accept}$ with probability $\cos^{2}(\pi/8)\approx 0.85$.
+\end{thm}
+The first 5 steps are realizable efficiently by the definition of trapdoor-claw free functions. 
+The state $\ket{\psi}$ before step \ref{hb} is $\ket{r\cdot x_{0}}\ket{x_{0}}$, and after applying a Hadamard transform the state is \begin{align}\sum_{d \in \{0,1\}^{n}}{(-1)^{d\cdot x_{0}}\ket{r\cdot x_{0}}\ket{d}+(-1)^{d\cdot x_{1}}\ket{r\cdot x_{1}}\ket{d}}\end{align}  Grouping some terms we can simplify
+\begin{align}\sum_{d \in \{0,1\}^{n}}{(-1)^{d\cdot x_{0}}(\ket{r\cdot x_{0}}+(-1)^{d\cdot (x_{0}\oplus x_{1})}\ket{r\cdot x_{1}})\ket{d}}\end{align} After measuring $d$, the prover's state is now \begin{align}\ket{\psi}=\ket{r\cdot x_{0}} + (-1)^{d\cdot (x_{0}\oplus x_{1})}\ket{r\cdot x_{1}}\end{align}  Therefore, the (honest error-free quantum) prover's state can be fully determined by the verifier using $r,d,y$, and $x_{0},x_{1}$ which are obtained by running $T_{k}(t_{k},y)$.
+
+We proceed by calculating the likely $\hat{c}$ by calculating the inner product of all possibilities of the recovered state (of the verifier) and the rotated basis. This calculation is summarized in tables \ref{probs1} and \ref{probs2}.
+
+\begin{table}[ht]
+  \centering
+  \begin{tabular}{|l|r|r|r|r|r|r|r|}
+    \hline
+    $\ket{\psi}$ & 
+    $r\cdot x_{0}$ & $r\cdot x_{1}$ & $\alpha=r\cdot (x_{0}\oplus x_{1})$ &  $\beta=d\cdot (x_{0}\oplus x_{1})$ &
+    $\hat{c}$ \\
+    \hline
+    $\ket{0}$   & 0 & 0 & 0 & 0 & +1  \\
+    $\ket{1}$  & 1 & 1 & 0 & 0 & -1 \\
+    $\ket{+}$  & ? & ? & 1 & 0 & +1 \\
+    $\ket{-}$   & ? & ? & 1 & 1 & -1\\
+    \hline
+  \end{tabular}
+  
+\caption{For $m = 0$: The $\hat{c}$ column describes the likely $c$ that will be sent from an honest error-free prover. Question marks (?) indicate values that are undetermined by state of the honest error-free prover.}
+\label{probs1}
+
+\end{table}
+
+\begin{table}[ht]
+  \centering
+  \begin{tabular}{|l|r|r|r|r|r|r|r|}
+    \hline
+    $\ket{\psi}$ & 
+    $r\cdot x_{0}$ & $r\cdot x_{1}$ & $\alpha=r\cdot (x_{0}\oplus x_{1})$ &  $\beta=d\cdot (x_{0}\oplus x_{1})$ &
+    $\hat{c}$ \\
+    \hline
+    $\ket{0}$   & 0 & 0 & 0 & 0 & +1  \\
+    $\ket{1}$  & 1 & 1 & 0 & 0 & -1 \\
+    $\ket{+}$  & ? & ? & 1 & 0 & -1 \\
+    $\ket{-}$   & ? & ? & 1 & 1 & +1\\
+    \hline
+  \end{tabular}
+ 
+\caption{For $m=1$: The $\hat{c}$ column describes the likely $c$ that will be sent from an honest error-free prover. Question marks (?) indicate values that are undetermined by state of the honest error-free prover.}
+\label{probs2}
+
+\end{table}
+The verifier chooses the likely $c$ based on this table. The verifier constructs a Bayesian estimator  $\hat{c}(r,x_{0},x_{1},d,m)$ for $c$. It accepts if the output of the prover is equal to the Bayesian's estimator output. This happens with probability $\cos^{2}\left(\frac{\pi}{8}\right) \approx 0.85$. This means that an error-free honest quantum prover causes the verifier accepts with probability $\cos^{2}(\pi/8)\approx 0.85$. 
+\\
+The formula for $\hat{c}$ is given by:
+\begin{align}\hat{c}_{m}(r,x_{0},x_{1},d) = \begin{cases*}
+                    $+1$ & if  $r\cdot x_{0} = r\cdot x_{1} = 0$ or $r \cdot (x_{0} \oplus x_{1}) = 1, d \cdot (x_{0} \oplus x_{1})=m$  \\
+                     $-1$ & otherwise
+                 \end{cases*} \end{align} It can be derived by looking at the expected state of the honest error-free quantum prover together with the two tables that describe the measurements' probabilities. We define $\alpha = r\cdot(x_{0}\oplus x_{1})$ and $\beta = d\cdot (x_{0}\oplus x_{1})$. Using this notation
+\begin{align}\label{cm}\hat{c}_{m}(r,x_{0},x_{1},d) = (1-\alpha) \cdot (-1)^{r\cdot x_{0}} + \alpha \cdot (-1)^{\beta} \cdot (-1)^{m}\end{align} 
+
+\subsubsection{Some Remarks}
+For equation \ref{cm}, \begin{align}\hat{c}(r,x_{0},x_{1},d,0)\cdot \hat{c}(r,x_{0},x_{1},d,1) = (1-\alpha)^{2} - \alpha^{2} = 1-2\alpha = (-1)^{\alpha}\end{align}  and for $\alpha=0$,
+\begin{align}\hat{c}(r,x_{0},x_{1},d,0)=\hat{c}(r,x_{0},x_{1},d,1)=(-1)^{r\cdot x_{0}} = (-1)^{r\cdot x_{1}}\end{align} 
+
+\section{Soundness for the classical Case}
+\begin{thm}[Soundness]
+A $\mathrm{BPP}$ adversary ($\mathcal{A}$) will cause the verifier to return $\mathrm{Accept}$ with probability at most $\frac{3}{4}+\epsilon(n)$, for some negligible $\epsilon$.
+\end{thm} Assuming the contrary, we prove prove theorem \ref{findclaw}. This leads to a contradiction to the claw-free property of trapdoor claw free functions.
+
+\begin{definition}
+For an adversary $\mathcal{A}$ that causes the verifier to accept with probability $\frac{3}{4}+\mu(n)$, we define $y$ to be good with respect to $\mathcal{A}$ if the probability that the verifier accepts, given that $\mathcal{A}$ outputted $y$ (after receiving $k$), $p_{y,k}$ is greater than $\frac{3}{4}+\mu(n)$
+\end{definition}
+\begin{lem}
+\label{goody}
+For an adversary $\mathcal{A}$ that causes the verifier to accept with probability $\frac{3}{4}+2\mu(n)$, \begin{align}p_{\mathrm{good}}=\Pr_{y,k}[p_{y,k} \geq \frac{3}{4} + \mu(n)]\geq 4\mu(n)\end{align}
+\end{lem} \textbf{Proof of lemma \ref{goody}.}
+Let $X=p_{y,k}$, Since $\mathbb{E}[X]\geq\frac{3}{4}+2\mu(n)$ by lemma \ref{markovlemma}, \begin{align}
+    \Pr\left(X\geq \frac{3}{4}+\mu(n)\right) \geq \frac{\mu(n)}{\frac{1}{4}-\mu(n)}\geq 4\mu(n).
+\end{align}
+
+\subsection{Computing the exclusive-or of the preimages}
+\begin{thm}
+\label{xorrecovery}
+Given a $\mathrm{BPP}$ adversary ($\mathcal{A}$) that can cause the verifier to accept with probability greater that $\frac{3}{4}+\mu(n)$, for some non-negligible $\mu$, and a good $y$, there exists a $\mathrm{BPP}$ algorithm $\mathcal{B}_{x_{0}\oplus x_{1}}(f_{k})$ that returns a $\mathrm{poly}(n)$ list $L$, such the $\Pr[x_{0}\oplus x_{1}\in L]\geq\frac{1}{2}$ (where $x_{0}, x_{1}$ are the preimages of $y$), where the randomness is taken over the the coins of the algorithm.
+\end{thm}
+
+\begin{lem}
+\label{lemmas1}
+Given a $\mathrm{BPP}$ adversary ($\mathcal{A}$) that can cause the verifier to accept with probability greater that $\frac{3}{4}+\mu(n)$, for some non-negligible $\mu$ and a good $y$, there exists a $\mathrm{BPP}$ algorithm $\mathcal{S}_{1}(f_{k}, r)$ that for every $r\in\{0,1\}^{n}$, returns $(-1)^{\alpha}$ with probability greater than $\frac{1}{2}+\mu(n)$, where $(x_{0}, x_{1})$ are the pre-images of $y$, and $\alpha = r\cdot (x_{0} \oplus x_{1})$, where the probability is taken over the algorithm's random coins.
+\end{lem}
+\textbf{Proof of Lemma \ref{lemmas1}.} We first give a description of $\mathcal{S}_{1}(f_{k}, r)$:
+
+
+\begin{enumerate}
+    \item Send $r\in\{0,1\}^{n}$ to $\mathcal{A}$, run $\mathcal{A}$ to get a bitstring $d\leftarrow \mathcal{A}(r)$.
+    \item Choose $m=0$ and send it to $\mathcal{A}$, run $\mathcal{A}$ to yield $c_{0}\leftarrow\mathcal{A}(m)$.
+    \item Rewind $\mathcal{A}$, choose $m=1$ and send it to $\mathcal{A}$, run $\mathcal{A}$ to yield $c_{1}\leftarrow\mathcal{A}(m)$.
+    \item Return $(r, c_{0}\cdot c_{1})$
+\end{enumerate} By our assumption about the success probability of $\mathcal{A}$, the probability that $\mathcal{A}$ succeeds in the experiment is:
+\begin{align}\frac{\Pr[c_{0} = \hat{c}(r,x_{0},x_{1},d,+1)] + \Pr[c_{1} = \hat{c}(r,x_{0},x_{1},d,-1)]}{2} \geq \frac{3}{4}+\mu(n)\end{align}  The probability that $\mathcal{A}$ failed in both experiments is at most
+\begin{align}\Pr[c_{0} \neq \hat{c}(r,x_{0},x_{1},d,0)] + \Pr[c_{1} \neq \hat{c}(r,x_{0},x_{1},d,1)]\leq 2 - 2\cdot \left(\frac{3}{4} + \mu(n)\right) = \frac{1}{2} - 2\mu(n)\end{align}  By union bound, the probability that $c_{0}=\hat{c}(r,x_{0},x_{1},d,0)$ and $c_{1}=\hat{c}(r,x_{0},x_{1},d,1)$ is at least $\frac{1}{2}+2\mu(n)$. Note that $\hat{c}(r,x_{0},x_{1},d,0)\cdot \hat{c}(r,x_{0},x_{1},d,1)=(-1)^{\alpha}$. Therefore,
+\begin{align}
+    \Pr[c_{0}\cdot c_{1}=(-1)^{\alpha}] &= \Pr[c_{0}\cdot c_{1} = \hat{c}_{0}\cdot \hat{c}_{1}]\\
+    &\geq \Pr[c_{0}=\hat{c}_{0}, c_{1}=\hat{c}_{1}]\\
+    &\geq \frac{1}{2}+2\mu(n)
+\end{align} \textbf{Proof of theorem \ref{xorrecovery}.} 
+By Theorem \ref{gl}, on $r\mapsto(-1)^{r\cdot (x_{0} \oplus x_{1})}$, (we run $\mathcal{S}_{1}$ with the same random coins on each iteration of the Goldreich-Levin Algorithm), and Lemma $\ref{lemmas1}$, we have a $\mathrm{PPT}$ algorithm $\mathcal{B}_{x_{0}\oplus x_{1}}(f_{k})$ that returns a polynomial-length list of candidates that contains $x_{0}\oplus x_{1}$ w.p. greater than $\frac{1}{2}$, where the probability is taken over the random coins of the algorithm and $k$.
+
+
+\subsection{Finding both preimages}
+\begin{thm}
+\label{fullrecovery}
+Given a $\mathrm{BPP}$ adversary ($\mathcal{A}$) that can cause the verifier to accept with probability greater that $\frac{3}{4}+\mu(n)$, for some non-negligible $\mu$, for any good $y$, $a=(x_{0}\oplus x_{1})$, where $x_{0}, x_{1}$ are the preimages of $f_{k}$, there exists a $\mathrm{BPP}$ algorithm $\mathcal{B}_{x_{0},x_{1}|x_{0}\oplus x_{1}}(f_{k}, a)$ that returns a $\mathrm{poly}(n)$ list $L$ such the $(x_{0}, x_{1})\in L$ (where $x_{0}, x_{1}$ are the preimages of $f_{k}$) w.p. greater than $\frac{1}{2}$, where the probability is taken over the algorithm's coins.
+\end{thm}
+
+
+\begin{lem}
+\label{lemmas2}
+Given a $\mathrm{BPP}$ adversary ($\mathcal{A}$) that can cause the verifier to accept with probability greater that $\frac{3}{4}+\mu(n)$, for some non-negligible $\mu$, there exists a $\mathrm{BPP}$ algorithm $\mathcal{S}_{2}(f_{k}, a)$ that for every $s\in\{0,1\}^{n-1}$ returns $(-1)^{s\cdot B^{\top}x_{0}}$ with probability greater than $\frac{1}{2}+\mu(n)$,  $x_{0}$ is a pre-image of $y$, and 
+$\mathcal{B}$ is a full-rank basis of $\{a\}^{\perp} = \left\{x\in\{0,1\}^{n}\mid x\cdot a = 0\right\}$ (also known as the dual code) which can be represented by the columns of the matrix $B\in\{0,1\}^{n\times n-1}$ (the parity check matrix). The probability is taken over the algorithm's random coins and $k$.
+\end{lem}
+\textbf{Proof of Lemma \ref{lemmas2}.} We first give a description of $\mathcal{S}_{2}(f_{k}, a)$:
+
+
+\begin{enumerate}
+    \item Construct the parity-check matrix $B$. Let $i_{0}\in\{1,\dots,n\}$ be such that $a_{i_{0}}=1$, then $B_{i_{0},i}=a_{i}$, and $B_{i,i}=1$, otherwise $B_{i,j}=0$ for all $i,j\in \{1,\dots,n\}\times \{1,\dots,n-1\}$.
+    \item Send $r=Bs$ to $\mathcal{A}$, run $\mathcal{A}$ to get a bitstring $d\leftarrow \mathcal{A}(r)$.
+    \item Choose randomly chose $m=0/1$ and send it to $\mathcal{A}$, run $\mathcal{A}$ to yield $c_{m}\leftarrow\mathcal{A}(m)$ and return $c_{m}$.
+\end{enumerate}
+By our assumption, the probability that $\mathcal{A}$ succeeds in the experiment is greater than $\frac{3}{4}+\mu(n)$. Denote probability that $\mathcal{A}$ succeed as $q_{r}$, We know that \begin{align}\mathbb{E}_{r}[q_{r}] \geq \frac{3}{4}+\mu(n)\end{align}  For a subset $S\subseteq \{0,1\}^{n}$ such that $|S|=2^{n-1}$,
+\begin{align}\mathbb{E}_{r}[q_{r}] = \frac{\sum_{r\in S}{q_{r}} + \sum_{r\notin S}{q_{r}}}{2^{n}} \leq \frac{1}{2} + \frac{\sum_{r\in S}{q_{r}}}{2^{n}} = \frac{1}{2} + \frac{1}{2}\cdot \mathbb{E}_{r\underset{\mathcal{U}}{\leftarrow} S}[q_{r}]\end{align}  Therefore, $\mathbb{E}_{r\underset{\mathcal{U}}{\leftarrow} S}[q_{r}] \geq \frac{1}{2} + 2\mu(n)$.
+Note that,
+\begin{align}Bs \cdot (x_{0} \oplus x_{1}) = Bs \cdot a = s \cdot B^{\top} a = s\cdot 0 = 0\end{align}  or in our notation $\alpha = 0$, and $r\cdot x_{0} = r\cdot x_{1}$.
+Therefore, $\hat{c}_{m} = (-1)^{Bs\cdot x_{0}} = (-1)^{Bs\cdot x_{1}}$. Hence,
+\begin{align}\Pr[c_{m}=(-1)^{s\cdot B^{\top}x_{0}}]=\Pr[c_{m} = \hat{c}_{m}(r,x_{0},x_{1},d)]\geq\frac{1}{2}+2\mu(n) \end{align}  Since $\left|\left\{Bs: s\in \{0,1\}^{n-1}\right\}\right| = 2^{n-1}$.\\
+\textbf{Proof of theorem \ref{fullrecovery}.} 
+By Theorem \ref{gl} on $s\mapsto (-1)^{s\cdot B^{\top}x_{0}}$ (we run $\mathcal{S}_{2}$ with the same random coins on each iteration of the Goldreich-Levin Algorithm), and Lemma $\ref{lemmas2}$, we have a polynomial-time algorithm that returns a list $L$ of candidates that contains  $B^{\top}x_{0}$, such that $\Pr[B^{\top}x_{0}\in L]\geq \frac{3}{4}$.
+
+Using a poly-time algorithm we can recover the two solutions to $B^{\top}x = z_{i}$, $(s_{i,1}, s_{i,2})$ for every $z_{i}\in L$ and output all of the solutions in a new list $L'=\{(s_{1,1}, s_{1,2}),\dots,(s_{|L|,1},s_{|L|,2})\}$. By Theorem \ref{gl}, $B^{\top}x_{0}\in L$ with probability greater than $\frac{3}{4}$. Thus, the two solutions to $B^{\top}x=B^{\top}x_{0}$ are in $L'$ with probability greater than $\frac{3}{4}$. The solutions are $(x_{0}, x_{1})$, since $B^{\top}x_{0}=B^{\top}x_{0}$ and $B^{\top}x_{1}=B^{\top}x_{0}+B^{\top}a=B^{\top}x_{0}$.
+
+\begin{thm}
+\label{findclaw}
+Given a $\mathrm{BPP}$ adversary ($\mathcal{A}$) that can cause the verifier to accept with probability greater that $\frac{3}{4}+\mu(n)$, for some non-negligible $\mu$, then there exists a  algorithm $\mathcal{B}$ that can find claws for $f_{k}$ with some non-negligible probability, over both the choice of $k$ and the random coins of $\mathcal{A}$.
+\end{thm}
+
+\textbf{Proof.} We define two subroutines for the algorithm $\mathcal{B}(f_{k})$, $\mathcal{B}_{x_{0}\oplus x_{1}}(f_{k})$ returns a polynomial list of candidates for $x_{0}\oplus x_{1}$ and $\mathcal{B}_{x_{0}, x_{1}|x_{0}\oplus x_{1}}(f_{k}, a)$ return a polynomial list of candidates for $(x_{0}, x_{1})$, given $a=x_{0}\oplus x_{1}$. We assume that $y$ is good (it can be generated with non-negligible probability). For the rest of the analysis, we fix $f_{k}$ and $y\leftarrow \mathcal{A}(f_{k})$.
+
+\textbf{Description of the algorithm for computing claws:}
+\begin{enumerate}
+    \item Run $\mathcal{B}_{x_{0}\oplus x_{1}}(f_{k})$ and choose a random candidate from the list for $a=x_{0}\oplus x_{1}$.
+    \item Run $\mathcal{B}_{x_{0}, x_{1}|x_{0}\oplus x_{1}}(f_{k}, a)$, and return a random candidate from the list for $(x_{0},x_{1})$.
+\end{enumerate}
+
+By theorem \ref{xorrecovery}, $\mathcal{B}_{x_{0}\oplus x_{1}}(f_{k})$ computes a polynomial-list (in $n$) of candidates for $x_{0}\oplus x_{1}$. By theorem \ref{fullrecovery}, $\mathcal{B}_{x_{0}, x_{1}|x_{0}\oplus x_{1}}(f_{k}, x_{0}\oplus x_{1})$, computes a polynomial-list (in $n$) of candidates for $(x_{0}, x_{1})$ given $x_{0}\oplus x_{1}$. A simple union bound argument shows that, \begin{align}\Pr[\mathcal{B}_{x_{0}\oplus x_{1}}(f_{k})\text{ succeeded and }\mathcal{B}_{x_{0}, x_{1}|x_{0}\oplus x_{1}}(f_{k}, x_{0}\oplus x_{1})\text{ succeeded}] \geq \frac{1}{2}\end{align}  The probability that the algorithm chooses $x_{0}\oplus x_{1}$ from the first list is non-negligible and the probability that the algorithm returns $(x_{0}, x_{1})$ given that it previously chose $x_{0}\oplus x_{1}$ is also non-negligible. Hence, for $y$ and $f_{k}$ which occur with non-negligible probability, with non-negligible probability we obtain an algorithm that computes the claw of $f_{k}$. Therefore, with non-negligible probability we obtain an algorithm that return a claw of a trapdoor claw-free function, with randomness taken over $\mathcal{A}$ and $k\in K$.
+
+% \section{The Degenerate Case (d=constant)}
+% \begin{thm} \label{dequalszero}
+% A $\mathrm{BQP}$ adversary ($\mathcal{A}$) that always sends the same $d$ can cause the verifier to return $\mathrm{Accept}$ most $\frac{3}{4} + \varepsilon(n)$, for some negligible $\varepsilon$.
+% \end{thm}
+% \begin{lem}  \label{dequalszeroalgorithm}
+% If there exists a $\mathrm{BQP}$ adversary $\mathcal{A}$ that always sends the same $d$ and causes the verifier to accept with probability greater than $\frac{3}{4}+\mu(n)$ for some non-negligible $\mu(n)$, then there exist two $\mathrm{BQP}$ algorithms $\tilde{\mathcal{B}}_{+1}, \tilde{\mathcal{B}}_{-1}$ where one of them has the property that for every $r\in\{0,1\}^{n}$, the algorithm returns $(y, (-1)^{r\cdot x_{0}})$ with probability greater than $\frac{1}{2} + \mu(n)$, where $y$ is taken from some distribution and $(x_{0}, x_{1})$ are the pre-images of $y$ (We assume that the pre-images are both non-zero). \newline\newline The probabilities are taken over $k$ and the randomness of the quantum algorithm.
+% \end{lem} \textbf{Proof of lemma \ref{dequalszeroalgorithm}.}
+% We first send $k$ to the prover, and run $\mathcal{A}$ to get a bitstring $y\leftarrow \mathcal{A}(k)$.
+% We first describe $\mathcal{B}_{m}(r)$ (where $m\in\{-1,1\})$.\newline \textbf{Description.}
+% \begin{enumerate}
+%     \item Send $r$ to the prover, run $\mathcal{A}$ to get a bitstring $d\leftarrow \mathcal{A}(r)$.
+%     \item Send $m$ to the prover, run $\mathcal{A}$ to get a bit $c_{m}\leftarrow \mathcal{A}(m)$.
+%     \item Return $c_{m}$.
+% \end{enumerate}
+% \textbf{Correctness.}
+% We prove that $\Pr[c_{1} = (-1)^{r\cdot x_{0}}] \geq \frac{1}{2} + \mu(n)$ or $\Pr[c_{-1} = (-1)^{r\cdot x_{0}}] \geq \frac{1}{2} + \mu(n)$ with probability greater than $\frac{1}{2}+\mu(n)$, where the randomness is taken over $r$. By our assumption, the probability that $\mathcal{A}$ succeeds in the experiment is \begin{align}\frac{\Pr[c_{1} = \hat{c}(r,x_{0},x_{1},d,+1)] + \Pr[c_{-1} = \hat{c}(r,x_{0},x_{1},d,-1)]}{2} \geq \frac{3}{4}+\mu(n)\end{align}  Therefore either $\Pr[c_{1} = \hat{c}(r,x_{0},x_{1},d,+1)]\geq \frac{3}{4}+\mu(n)$ or $ \Pr[c_{-1} = \hat{c}(r,x_{0},x_{1},d,-1)] \geq \frac{3}{4}+\mu(n)$. Let $m \in \{-1, 1\}$ be an index such that $\Pr[c_{m} = \hat{c}(r,x_{0},x_{1},d,m)] \geq \frac{3}{4} + \mu(n)$.
+
+% \begin{align}
+% \Pr_{r}[c=(-1)^{r\cdot x_{0}}] &= \Pr_{r}[c=\hat{c}|\hat{c}=(-1)^{r\cdot x_0}]\cdot \Pr_{r}[\hat{c}=(-1)^{r\cdot x_{0}}]\\ &+ \Pr_{r}[c\neq \hat{c} | \hat{c}\neq (-1)^{r\cdot x_{0}}]\cdot \Pr_{r}[\hat{c}\neq (-1)^{r\cdot x_{0}}]
+%     \end{align}
+% We know that $\Pr_{r}[r\cdot (x_{0}\oplus x_{1}) = 1]=\frac{1}{2}$. Assuming $x_{0} \neq 0$, and $x_{1}\neq 0$, and $x_{0}\oplus x_{1} \neq 0$ by definition, \begin{align} \Pr_{r}\left[r \cdot (x_{0} \oplus x_{1}) = 1 \text{ and }(-1)^{r\cdot x_{0}}=m\cdot (-1)^{d\cdot (x_{0}\oplus x_{1})}\right]= \frac{1}{4}\end{align} Using the equation $\hat{c} = (1-r\cdot (x_{0}\oplus x_{1})) \cdot (-1)^{r\cdot x_{0}} + r\cdot (x_{0}\oplus x_{1}) \cdot m \cdot (-1)^{d\cdot (x_{0}\oplus x_{1})}$ \begin{align}\Pr_{r}[\hat{c}(r,x_{0},x_{1},d,m)=(-1)^{r\cdot x_{0}}] = \Pr_{r}[r\cdot (x_{0} \oplus x_{1}) = 0] + \Pr_{r}\left[r \cdot (x_{0} \oplus x_{1}) = 1 \text{ and }(-1)^{r\cdot x_{0}}=m\cdot (-1)^{d\cdot (x_{0}\oplus x_{1})}\right] = \frac{3}{4}\end{align}  Plugging in to the previous equation we obtain,
+% \begin{align}\Pr_{r}[c=(-1)^{r\cdot x_{0}}]=\frac{3}{4}\cdot \Pr_{r}[c=\hat{c}|\hat{c}=(-1)^{r\cdot x_0}] + \frac{1}{4}\cdot \Pr_{r}[c\neq \hat{c} | \hat{c}\neq (-1)^{r\cdot x_{0}}]\end{align}  Moreover,
+% \begin{align}\Pr_{r}[\hat{c}\neq c]=\Pr_{r}[\hat{c}=(-1)^{r\cdot x_{0}}]\cdot \Pr_{r}[\hat{c}\neq c|\hat{c}=(-1)^{r\cdot x_{0}}] + \Pr_{r}[\hat{c}\neq (-1)^{r\cdot x_{0}}] \cdot \Pr_{r}[\hat{c} \neq c|\hat{c}\neq (-1)^{r\cdot x_{0}}]\end{align} 
+% Substituting the probabilities in again, \begin{align}\Pr_{r}[\hat{c} \neq c]=\frac{3}{4}\cdot \Pr_{r}[\hat{c} \neq c|\hat{c}=(-1)^{r\cdot x_{0}}] + \frac{1}{4} \cdot \Pr_{r}[\hat{c} \neq c|\hat{c}\neq (-1)^{r\cdot x_{0}}]\end{align} 
+% We can sum both equations to get,
+% \begin{align}\Pr_{r}[\hat{c}\neq c] + \Pr_{r}[c=(-1)^{r\cdot x_{0}}] = \frac{3}{4} + \frac{1}{2}\cdot \Pr_{r}[\hat{c} \neq c|\hat{c}\neq (-1)^{r\cdot x_{0}}]\end{align} Subtracting terms from both sides \begin{align}\Pr_{r}[c=(-1)^{r\cdot x_{0}}] = \frac{3}{4} + \frac{1}{2}\cdot \Pr_{r}[\hat{c}\neq c|\hat{c}\neq (-1)^{r\cdot x_{0}}] - \Pr_{r}[\hat{c} \neq c] \geq \frac{3}{4} - \frac{1}{4} + \mu(n) \geq \frac{1}{2} + \mu(n)\end{align}  
+% The algorithm $\tilde{\mathcal{B}}_{m}$ that first sends $k$ to $\mathcal{A}$ to yield a bitstring $y$ and runs $\mathcal{B}_{m}$ has the desired property.
+
+% \begin{remark} The keen reader might ask why this oracle produces $r\cdot x_{0}$ and not $r\cdot x_{1}$, because the case for $x_{1}$ is symmetrical. The explanation is that it actually produces both. This is best illustrated with an example. Let $y=f_{k}(x_{0})=f_{k}(x_{1})$. Suppose a deterministic oracle $\mathcal{O}:\{0,1\}^{n}\mapsto \{0,1\}$ is defined as follows:
+% \begin{enumerate}
+%     \item If $r\cdot x_{0} = r\cdot x_{1}$, $\mathcal{O}(r)=r\cdot x_{0}$.
+%     \item Otherwise, $\mathcal{O}(r)=1$.
+% \end{enumerate}
+% This oracle returns $r\cdot x_{0}$ with probability $\frac{3}{4}$ and also returns $r\cdot x_{1}$ with probability $\frac{3}{4}$. By theorem \ref{gl}, we can use this oracle with list-decoding to compute a $\mathrm{poly}(n)$-size list $L$, such that $\Pr[x_{0}\in L] \geq \frac{3}{4}$ and also $\Pr[x_{1}\in L] \geq \frac{3}{4}$. It might be the case that $x_{0}, x_{1} \in L$, since \begin{align}\Pr[x_{0}\in L\text{ and }x_{1}\in L] \geq 1 - \Pr[x_{0}\notin L\text{ or }x_{1}\notin L] \geq 1 - 2\cdot \left(1- \frac{3}{4}\right) = \frac{1}{2}\end{align} \end{remark} 
+% \begin{remark} \label{generaldalgorithm} This proof relied on the fact that \begin{align}\Pr_{r}[r\cdot (x_{0}\oplus x_{1}) = 1\text{ and }(-1)^{r\cdot x_{0}} = m\cdot (-1)^{d\cdot (x_{0}\oplus x_{1})}]=\frac{1}{4}$$ but it still works if $$\Pr_{r}[r\cdot (x_{0}\oplus x_{1}) = 1\text{ and }(-1)^{r\cdot x_{0}} = m\cdot (-1)^{d\cdot (x_{0}\oplus x_{1})}]\geq\frac{1}{4} - \mu(n)/2\end{align} \end{remark}
+% \begin{remark}[Why I think that rewinding shouldn't work WIP] \label{rewindingshouldntwork}  If $d$ is constant then this fact is true for both $x_{0}$ and $x_{1}$, and this proof works for the symmetric case. If $d$ is not constant, then the proof works for only one of the pre-images. To see why this is true, let $m\in\{-1,1\}$ be an index such that $\Pr[c_{m}=\hat{c}(r,x_{0},x_{1},d,m)]\geq \frac{3}{4}+\mu(n)$.
+% Assume that d is a function of $r,y,k$, $d=d(r,y,k)$. \begin{align}\Pr[r\cdot (x_{0} \oplus x_{1}) = 1\text{ and }(-1)^{r\cdot x_{0}} = m\cdot (-1)^{d\cdot (x_{0}\oplus x_{1})}] > \frac{1}{4} + \mu(n)/2\end{align} where $(x_{0}, x_{1})$ are preimages of $y$. Using the same algorithm as before we can find $x_{0}$. Then either
+
+% \begin{align}\Pr[r\cdot x_{0} = 0\text{ and }r\cdot x_{1} = 1\text{ and }m = (-1)^{d\cdot (x_{0}\oplus x_{1})}] > \frac{1}{4} + \mu(n)/2\end{align}
+% or
+% \begin{align}\Pr[r\cdot x_{0} = 1\text{ and }r\cdot x_{1} = 0\text{ and }m \neq (-1)^{d\cdot (x_{0}\oplus x_{1})}] > \frac{1}{4} + \mu(n)/2\end{align} 
+% Assume w.l.o.g that the first inequality holds then there exists an $\mathcal{E}$ that returns $(s, (-1)^{s\cdot B^{\top}x_{1}})$ for every $s\in\{0,1\}^{n-1}$ with probability greater than $\frac{1}{2}+\mu(n)$ (assuming we have the first preimage $x_{0}$)
+% where $B$ is the parity-check matrix for $x_{0}$. $\mathcal{E}$ runs the protocol with $r=Bs$, for $s$ chosen uniformly at random. 
+% \begin{align}
+% \Pr[c=(-1)^{r\cdot x_{1}} | r\cdot x_{0}=0] &= \Pr[c=\hat{c}|\hat{c}=(-1)^{r\cdot x_{1}},r\cdot x_{0}=0]\cdot \Pr[\hat{c}=(-1)^{r\cdot x_{1}}| r\cdot x_{0} = 0] \\&+ \Pr[c\neq \hat{c} | \hat{c}\neq (-1)^{r\cdot x_{1}}, r\cdot x_{0}=0]\cdot \Pr[\hat{c}\neq (-1)^{r\cdot x_{1}}| r\cdot x_{0}=0].
+% \end{align}
+% Using the equation $\hat{c}=(1-r\cdot x_{1})(-1)^{r\cdot x_{1}} + r\cdot x_{1}\cdot m\cdot (-1)^{d\cdot (x_{0}\oplus x_{1})}$ By the first inequality \begin{align}
+% p = \Pr[\hat{c}=(-1)^{r\cdot x_{1}} | r\cdot x_{0}=0] > \frac{3}{4} + \frac{\mu(n)}{2}
+% \end{align}
+% Using Bayes theorem,
+% \begin{align}\Pr_{r}[\hat{c}\neq c|r\cdot x_{0}=0]&=\Pr_{r}[\hat{c}=(-1)^{r\cdot x_{1}}|r\cdot x_{0}=0]\cdot \Pr_{r}[\hat{c}\neq c|\hat{c}=(-1)^{r\cdot x_{1}},r\cdot x_{0}=0] \\&+ \Pr_{r}[\hat{c}\neq (-1)^{r\cdot x_{1}}|r\cdot x_{0}=0] \cdot \Pr_{r}[\hat{c} \neq c|\hat{c}\neq (-1)^{r\cdot x_{1}}, r\cdot x_{0}=0]\end{align} 
+% Summing both equations we obtain
+% \begin{align}
+% p + (1-p) \cdot \Pr[\hat{c}\neq c|\hat{c}\neq (-1)^{r\cdot x_{1}}, r\cdot x_{0}=0]  =\Pr[c=(-1)^{r\cdot x_{1}}|r\cdot x_{0}=0] + \Pr_{r}[\hat{c}\neq c| r\cdot x_{0}=0]
+% \end{align}
+% Using the formula for conditional probability
+% \begin{align}
+% p + (1-p) \cdot \frac{\Pr[\hat{c}\neq c,\hat{c}\neq (-1)^{r\cdot x_{1}}|r\cdot x_{0}=0]}{\Pr[\hat{c}\neq(-1)^{r\cdot x_{1}}|r\cdot x_{0}=0]}   =\Pr[c=(-1)^{r\cdot x_{1}}|r\cdot x_{0}=0] + \Pr_{r}[\hat{c}\neq c| r\cdot x_{0}=0]
+% \end{align}
+% Hence,
+% \begin{align}
+% p +\Pr[\hat{c}\neq c,\hat{c}\neq (-1)^{r\cdot x_{1}}|r\cdot x_{0}=0]   =\Pr[c=(-1)^{r\cdot x_{1}}|r\cdot x_{0}=0] + \Pr_{r}[\hat{c}\neq c| r\cdot x_{0}=0]
+% \end{align}
+% We know that $\Pr[\hat{c}\neq c] \leq \frac{1}{4}-\mu(n)$ Therefore, $\Pr[\hat{c}\neq c|r\cdot x_{0}=0]\leq \frac{1}{2}-2\mu(n)$
+% \end{remark} 
+
+% \textbf{Proof of theorem \ref{dequalszero}.} Assume the contrary, that there exists a $\mathrm{BQP}$ adversary $\mathcal{A}$ that always sends a constant $d$ that can cause the verifier to return $\mathrm{Accept}$ with probability $\frac{3}{4}+\mu(n)$ for some noticeable $\mu(n)$. We describe a transformation that takes the adversary $\mathcal{A}$ and produces a $\mathrm{BQP}$ algorithm $\mathcal{D}$ such that
+% \begin{align}\Pr[f_{k}(x_{0})=f_{k}(x_{1})\wedge x_{0}\neq x_{1}|(x_{0},x_{1})\leftarrow \mathcal{D}(k)] \in O(1)\end{align}  where the probability is taken of the choice of $k$ and the randomness of $\mathcal{D}$. This breaks the trapdoor claw-free assumption of the family in $\mathcal{F}$ in the protocol. Let $\ket{\psi}$ represent the internal state of the prover after receiving $k$ and sending $y$. We describe the unitary $U_{\mathrm{IP}, m}$
+% \begin{align}U_{\mathrm{IP}, m}\ket{r}\ket{\psi}\ket{a_{1},\dots,a_{t}} = \ket{r}\ket{\phi}\ket{a_{t}\oplus \mathcal{B}_{m}(r)}\end{align}  Where $\phi$ is some quantum state. This is the matrix representation of the algorithm $U_{\mathrm{IP}}^{m}$, where $a_{1},\dots,a_{t-1}$ represent the scratch qubit that $\mathcal{B}_{m}$ uses and $a_{t}$ is the output qubit. We implement $U_{\mathrm{IP}, m}$ in a way such that the state of the first $n$ qubits stays the same for any $x\in\{0,1\}^{n}$ and $a\in\{0,1\}^{t}$. By Lemma \ref{dequalszeroalgorithm}, either $U_{\mathrm{IP}, +1}$ or $U_{\mathrm{IP}, -1}$ implement a quantum inner product query. We describe the algorithm $\mathcal{D}$:
+% \begin{itemize}
+%     \item Repeat for $m\in\{-1, 1\}$:
+%     \item Choose $k\in K$ uniformly and send it to $\mathcal{A}$ to yield $y$.
+%     \item Apply circuit $C$ as described in \ref{qgl} with $U_{\mathrm{IP}, m}$ 
+%     \item Measure the first $n$ qubits, save the result in some (classical) $\hat{x}_{0}$.
+%     \item Use the auxiliary state again and apply the circuit $C$ again with $U_{\mathrm{IP}, m}$
+%     \item Measure the first $n$ qubits, save the result in some (classical) $\hat{x}_{1}$.
+%     \item If $x_{0} \neq x_{1}$ and $f_{k}(x_{0})=f_{k}(x_{1})=y$, return the claw $(x_{0},x_{1})$.
+% \end{itemize} Let $(x_{0}, x_{1})$ be the preimages of $y$. By lemma \ref{dequalszeroalgorithm} for $m=-1$ or $m=+1$,   $\Pr[\hat{x}_{0}=x_{0}] = \Pr[\hat{x}_{1}=x_{1}] = 4\mu(n)^{2}$. Since the circuit is reused and the experiments are run independently,  \begin{align}\Pr[\hat{x}_{0}=x_{0}\text{ and }\hat{x}_{1}=x_{1}] \geq 16\mu(n)^{4}\end{align} Therefore, algorithm $\mathcal{D}$ returns a claw $(x_{0},x_{1})$ with non-negligible probability. 
+% \begin{remark}
+% The case where the adversary always returns $d(r)\overset{\triangle}{=}r$ has a very similar proof.
+% \end{remark}
+\section{Generalizing beyond classical provers} In the previous section we showed some negative results for classical provers using the classical Goldreich-Levin lemma. In this section we want to show how using the same ideas and with the Quantum Goldreich-Levin lemma (\cite{qgllemma}) at hand we can design an algorithm which computes claws.
+\subsection{Formalizing the Measurements}
+\begin{definition}[Quantum Devices]
+A Quantum device is defined to be:
+\begin{itemize}
+    \item $\ket{\psi}$ the state of the prover after sending $y$ to the prover.
+    \item The set $\left\{\Pi_{d}^{r}\right\}_{d\in \{0,1\}^{n}}$ of orthogonal projections corresponding to a measurement of $d$ given $r$, such that \begin{align}
+        \sum_{d\in\{0,1\}^{n}}\Pi_{d}^{r} = \mathbb{I}
+    \end{align} 
+    \item The set $\left\{\Pi^{(r,d,m)}_{c}\right\}_{m,c\in \{0,1\}}$ of binary orthogonal projections corresponding to a measurement of $c$ given $r, d, m$ such that \begin{align}
+        \Pi_{0}^{(r,d,m)} = \mathbb{I} - \Pi_{1}^{(r,d,m)}
+    \end{align}  We define $\Pi^{(r,m)}_{c} = \sum_{d} \Pi_{c}^{(r,d,m)}\Pi_{d}^{r}$. 
+\end{itemize}
+Equivalently, this measurements can be obtained by computing the following unitaries \begin{align}U_{m}\ket{r}_{R}\ket{\psi}\ket{0^{t}}\ket{0}_{O} = \sum_{d}\ket{r}_{R}\left(\Pi_{m}^{(r,d,0)}\Pi_{d}^{r}\ket{\psi}\ket{0^{t}}\ket{0}_{O}+\Pi_{m}^{(r,d,1)}\Pi_{d}^{r}\ket{\psi}\ket{0^{t}}\ket{1}_{O}\right)\end{align} Where $R$ is the register for $r$, $O$ is the output register.
+\end{definition}
+\begin{remark}
+We can assume that $U_{0}$ and $U_{1}$ act on the output qubit $O$ by applying an \mathrm{CNOT} to it where the result of the measurement is inputted as control.
+\end{remark} We proceed in defining some algebraic terms which will intuitively describe the probability of measuring some variables we are interested in finding.
+\\\\Define the projection on the correct values of $\hat{c}_{m}$ to be
+\begin{align}Q_{m}=\sum_{r}\ket{r}\bra{r}\otimes \sum_{d}\Pi_{\hat{c}_{m}(r,d,m)}^{(r,d)}\Pi_{d}^{r}\end{align} and the superposition of values with auxilliary qubit $\ket{\psi}$ \begin{align}\ket{\tilde{\psi}}=\frac{1}{\sqrt{2^{n}}}\sum_{r}\ket{r}\ket{\psi}\ket{0^{t}}\end{align}
+We describe an experiment, choose $r\in \{0,1\}^{n}$ uniformly at random, measure $d$ and finally output a bit $c_{m}$, we call this the $m$-experiment. The success rate for the $m$ experiment is \begin{align}p_{m}=\lVert Q_{m} \ket{\tilde{\psi}}\rVert^{2}\end{align}
+The probability that the adversary passes the protocol is given by \begin{align}\frac{1}{2}(p_{0}+p_{1})=\frac{1}{2}\lVert Q_{0} \ket{\tilde{\psi}}\rVert^{2} + \frac{1}{2}\lVert Q_{1} \ket{\tilde{\psi}}\rVert^{2}.\end{align} We define the success probability of computing the xor ($x_{0}\oplus x_{1}$) in the following way \begin{align}p_{\mathrm{xor}}=\lVert(Q_{0}Q_{1}+(\mathbb{I}-Q_{0})(\mathbb{I}-Q_{1}))\ket{\tilde{\psi}}\rVert^{2}
+\end{align} intuitively we succeed in finding the xor if we succeeded in both experiments or we failed in both experiments. $p_{\mathrm{xor}}$ can also be written as \begin{align}
+    p_{\mathrm{xor}} &= 1 + \left<\left\{Q_{0},Q_{1}\right\}\right>_{\tilde{\psi}} - \left<Q_{0}\right>_{\tilde{\psi}} - \left<Q_{1}\right>_{\tilde{\psi}}
+\end{align} exchanging terms, \begin{align}
+    \left<\left\{Q_{0},Q_{1}\right\}\right>_{\tilde{\psi}} = p_{\mathrm{xor}} + p_{0} + p_{1} - 1
+\end{align}
+If we define the state of the superposition over all values orthogonal to $x_{0}\oplus x_{1}$, \begin{align}\ket{\tilde{\psi}_{x_{0}\oplus x_{1}}}=\frac{1}{\sqrt{2^{n-1}}}\sum_{r\perp x_{0}\oplus x_{1}}\ket{r}\ket{\psi}\ket{0^{t}}\end{align} Then intuitively, the probability of finding $x_{i}$ given $x_{0}\oplus x_{1}$ in the following way, \begin{align}p_{i|x_{0}\oplus x_{1}}=\lVert Q_{i}\ket{\tilde{\psi}_{x_{0}\oplus x_{1}}}\rVert^{2}\end{align} \begin{lem} \label{lemma3}
+Given $\frac{1}{2}p_{0}+\frac{1}{2}p_{1} \geq \frac{3}{4}+\varepsilon$, $\frac{1}{2}p_{0|x_{0}\oplus x_{1}} + \frac{1}{2}p_{1|x_{0}\oplus x_{1}} \geq \frac{1}{2}+2\varepsilon$
+\end{lem}
+\textbf{Proof.} \begin{align}
+    p_{0}&= \frac{1}{2^{n}}\sum_{r\in\{0,1\}^{n}}\sum_{r\in\{0,1\}^{n}}\lVert \Pi_{0,\hat{c}_{0}}^{(r,d)}\Pi_{d}^{r} \ket{\psi}\ket{0^{t}} \rVert^{2}\\ &= \frac{1}{2}\cdot\frac{1}{2^{n-1}}\sum_{r\cdot (x_{0}\oplus x_{1})=0}\sum_{d \in \{0,1\}^{n}}\lVert \Pi_{0,\hat{c}_{0}}^{(r,d)}\Pi_{d}^{r} \ket{\psi}\ket{0^{t}} \rVert^{2} + \frac{1}{2}\cdot\frac{1}{2^{n-1}}\sum_{r\cdot (x_{0}\oplus x_{1})=1}\sum_{d\in\{0,1\}^{n}}\lVert \Pi_{0,\hat{c}_{0}}^{(r,d)}\Pi_{d}^{r} \ket{\psi}\ket{0^{t}} \rVert^{2}\\
+    &\leq \frac{1}{2} p_{0|x_{0}\oplus x_{1}} + \frac{1}{2}
+\end{align} In the same way, \begin{align}
+    p_{1}\leq \frac{1}{2}p_{1|x_{0}\oplus x_{1}} + \frac{1}{2}
+\end{align}
+Combining both inequalities, we obtain the inequality \begin{align}
+    \frac{1}{2}p_{0|x_{0}\oplus x_{1}}+\frac{1}{2}p_{1|x_{0}\oplus x_{1}}&\geq \frac{3}{2}-1+2\varepsilon = \frac{1}{2} + 2\varepsilon
+\end{align}
+Given these terms we can bound from below the probability the success of an algorithm for finding claws.
+ \begin{thm} \label{maintheorem} Given $y$ and residual state $\ket{\psi}$ (after applying the measurement on $y$).
+Assume $p_{\mathrm{xor}}= \frac{1}{2}+\varepsilon$ and $\frac{1}{2}p_{0}+\frac{1}{2}p_{1}= \frac{3}{4}+\varepsilon'$ for some non-negligible biases $\varepsilon, \varepsilon'$ then there exists a polynomial time quantum circuit that computes a claw of $f_{k}$ with probability at least $8\varepsilon\varepsilon'$.
+\end{thm}
+TODO: Add sketch of circuit.
+
+
+\textbf{Proof.} Our strategy is similar to the classical case. First, compute $x_{0}\oplus x_{1}$, then compute $x_{0}$ or $x_{1}$ using this value.
+ We begin with the state \begin{align}
+    \ket{0}_{R}\ket{\psi}_{Q}\ket{0^{t}}_{A}\ket{0}_{O}\ket{1}_{S}=\ket{0_{R},\psi_{Q},0^{t}_{A},0_{O},1_{S}}
+\end{align} the first register $R$ holds the query value, $Q$ holds the quantum auxilliary state, $A$ holds the ancilliary qubits qubits and $S$ is the sign qubit.
+We describe a circuit $C_{x_{0}\oplus x_{1}}$ that essentially compute the xor $x_{0}\oplus x_{1}$ with non-negligible probability. The construction is the same as in \cite{qgllemma}. The circuit $C_{x_{0}\oplus x_{1}}$ can be decomposed into the following operations:
+\begin{enumerate}
+    \item Operation $C_{1}$: apply a Hadamard gate on the $R$ register.
+    \item Operation $C_{2}$: apply $U_{1}U_{0}$ on $R$, $Q$, $A$, and $O$.
+    \item Operation $C_{3}$: apply a controlled-$Z$ operation with control qubit $O$ and output qubit $S$.
+    \item Operation $C_{4}$: apply $U_{0}^{\dagger}U_{1}^{\dagger}$ on $R$, $Q$, $A$ and $O$.
+    \item Operation $C_{5}$: apply a Hadamard gate on the $R$ register.
+\end{enumerate}
+We will begin by showing that \begin{align}
+    \bra{(x_{0}\oplus x_{1})_{R},\psi_{Q},0^{t}_{A},0_{O},1_{S}}C_{x_{0}\oplus x_{1}}\ket{0_{R},\psi_{Q},0^{t}_{A},0_{O},1_{S}} \geq 2\varepsilon
+\end{align} this can computed as the inner product between the state \begin{align}C_{4}C_{3}C_{2}C_{1}\ket{0_{R},\psi_{Q},0^{t}_{A},0_{O},1_{S}}\end{align} and \begin{align}C_{4}^{\dagger}C_{5}^{\dagger}\ket{(x_{0}\oplus x_{1})_{R},\psi_{Q},0^{t}_{A},0_{O},1_{S}}.\end{align} These states are
+\begin{align}
+    C_{3}C_{2}C_{1}\ket{0_{R},\psi_{Q},0^{t}_{A},0_{O},1_{S}}&=\frac{1}{\sqrt{2^{n}}}C_{3}C_{2}\sum_{r}\ket{r_{R},\psi_{Q},0^{t}_{A},0_{O},1_{S}}\\
+    &=C_{3}\frac{1}{\sqrt{2^{n}}}\sum_{r}{U_{1}U_{0}\ket{r}\ket{\psi}_{Q}\ket{0^{t}}_{A}\ket{0}_{O}}\ket{1}_{S}\\&=C_{3}\frac{1}{\sqrt{2^{n}}}\sum_{r}{\sum_{i,j}\ket{r}_{R}\Pi_{i}^{(r,1)}\Pi_{j}^{(r,0)}\ket{\psi}_{Q}\ket{0^{t}}_{A}}\ket{i\oplus j}_{O}\ket{1}_{S}\\&=\frac{1}{\sqrt{2^{n}}}\sum_{r}{\sum_{i,j}(-1)^{i\oplus j}\ket{r}_{R}\Pi_{i}^{(r,1)}\Pi_{j}^{(r,0)}\ket{\psi}_{Q}\ket{0^{t}}_{A}}\ket{i\oplus j}_{O}\ket{1}_{S}
+\end{align}
+and
+\begin{align}
+    C_{4}^{\dagger}C_{5}^{\dagger}\ket{(x_{0}\oplus x_{1})_{R},\psi_{Q},0^{t}_{A},0_{O},1_{S}} &= \frac{1}{\sqrt{2^{n}}}C_{4}^{\dagger}\sum_{r}(-1)^{r\cdot (x_{0}\oplus x_{1})}\ket{r}_{R}\ket{\psi}_{Q}\ket{0^{t}}_{A}\ket{0}_{O}\ket{1}_{S}\\&=\frac{1}{\sqrt{2^{n}}}\sum_{r}\sum_{i,j}(-1)^{r\cdot (x_{0}\oplus x_{1})}\ket{r}_{R}\Pi_{i}^{(r,1)}\Pi_{j}^{(r,0)}\ket{\psi}_{Q}\ket{0^{t}}_{A}\ket{i\oplus j}_{O}\ket{1}_{S}\end{align}
+If follows that
+\begin{align}
+    &\bra{(x_{0}\oplus x_{1})_{R},\psi_{Q},0^{t}_{A},0_{O},1_{S}}C\ket{0_{R},\psi_{Q},0^{t}_{A},0_{O},1_{S}}\\
+    &=\frac{1}{2^{n}}\sum_{r}\sum_{i,j}(-1)^{r\cdot (x_{0}\oplus x_{1})}(-1)^{i\oplus j} \lVert \Pi_{i}^{(r,1)}\Pi_{j}^{(r,0)}\ket{\psi}_{Q}\ket{0^{t}}_{A}\rVert^{2}\\
+    &=\frac{1}{2^{n}}\sum_{i\oplus j = r\cdot (x_{0}\oplus x_{1})}\lVert \Pi_{i}^{(r,1)}\Pi_{j}^{(r,0)}\ket{\psi}_{Q}\ket{0^{t}}_{A}\rVert^{2} - \frac{1}{2^{n}}\sum_{i\oplus j \neq r\cdot (x_{0}\oplus x_{1})}\lVert \Pi_{i}^{(r,1)}\Pi_{j}^{(r,0)}\ket{\psi}_{Q}\ket{0^{t}}_{A}\rVert^{2}\\
+    &=2p_{\mathrm{xor}} - 1= 2\varepsilon
+\end{align} 
+We can rewrite \begin{align}C_{x_{0}\oplus x_{1}}\ket{0_{R},\psi_{Q},0^{t}_{A},0_{O},1_{S}} = 2\varepsilon\ket{(x_{0}\oplus x_{1})_{R},\psi_{Q},0^{t}_{A},0_{O},1_{S}} + (1-2\varepsilon)\ket{\psi_{\mathrm{err}}}\end{align} where $\psi_{\mathrm{err}}$ is orthogonal to $\ket{(x_{0}\oplus x_{1})_{R},\psi_{Q},0^{t}_{A},0_{O},1_{S}}$. As in the classical case, we want to construct uniformly random $r$ on the subspace $\{r: r\cdot a = 0\}$. We define a unitary $T$ that can compute such distributions. Given a state $\ket{x}_{R}\ket{0}_{B}\ket{0}_{T}$ we define the unitary $T$ in the following manner \begin{align}
+    T\ket{a}_{R}\ket{x}_{B}\ket{0}_{T} =  \ket{a}_{R}\otimes \frac{1}{\sqrt{2^{n}}}\left(\sum_{r: r\cdot a = 0}(-1)^{r\cdot x}\ket{r}_{B}\ket{0}_{T} + \sum_{r: r\cdot a = 1}(-1)^{r\cdot x}\ket{r}_{B}\ket{1}_{T} \right)
+\end{align} This transformation is consists of a Hadamard gate and a Tofolli gate.
+
+% We can assume $\ket{0}$  does not depend on $x$. Suppose we have some circuit $T'$ which take act in the following way \begin{align}
+%     T'\ket{a}_{R}\ket{x}_{B}\ket{0}_{T} = \ket{a}_{R}\frac{1}{\sqrt{2^{n-1}}}\sum_{r\perp a}\ket{r}_{B}\ket{0}_{T}
+% \end{align} we define $T$ in the following way \begin{align}
+%     T\ket{a}_{R}\ket{x}_{B}\ket{0}_{T}\ket{1} = \ket{r}_{R}\frac{1}{\sqrt{2^{n-1}}}\sum_{r\perp a}(-1)^{r\cdot x}\ket{r}_{B}\ket{0}_{T}\ket{1}
+% \end{align}
+% using controlled-Z (without auxilliary qubits) gates on the $R$ and $B$ registers and therefore the unitary transformation $T$ doesn't interact with the residual state. \cite{Schuch_2003}
+
+Let $U$ be the circuit that applies $U_{0}$ or $U_{1}$ with equal probability and writes which unitary was applied in the register $M$ and acts on the gates $B,Q,A,O,M$. In other words \begin{align}
+    U\ket{0}_{M}=\frac{1}{\sqrt{2}}\sum_{m}U_{m}\ket{m}_{M}
+\end{align}We now apply a circuit $C_{x|x_{0}\oplus x_{1}}$ which can be decomposed into the following operations, \begin{enumerate}
+    \item Operation $D_{1}$: apply $T$ gate on $R$, $B$, $T$.
+    \item Measure the $T$ register, if the result is $1$ discard to computation, otherwise move on.
+    \item Operation $D_{2}$: apply $U$ on $B$, $Q$, $A$, $O$, $M$.
+    \item Operation $D_{3}$: apply a controlled-$Z$ operation with control qubit $O$ and output qubit $S$.
+    \item Operation $D_{4}$: apply $U^{\dagger}$ on $B$, $Q$, $A$, $O$, $M$.
+    \item Operation $D_{5}$: apply $T^{\dagger}$ gate $R$, $B$, $T$.
+\end{enumerate} We denote $a=x_{0}\oplus x_{1}$. As before we will compute \begin{align}
+\bra{a_{R},(x_{0})_{B},\psi_{Q},0_{A},0_{O},0_{T},1_{S}}C_{x|x_{0}\oplus x_{1}}\ket{a_{R},0_{B},\psi_{Q},0_{A},0_{O},0_{T},1_{S}}
+\end{align} Again this can be computed as the inner product of
+\begin{align}
+    &D_{3}D_{2}D_{1}\ket{a}_{R}\ket{0}_{B}\ket{\psi}_{Q}\ket{0}_{A}\ket{0}_{O}\ket{0}_{T}\ket{1}_{S}\ket{0}_{M}\\
+    &=D_{3}D_{2}\left(\frac{1}{\sqrt{2^{n-1}}}\ket{a}_{R}\sum_{r\perp a}\ket{r}_{B}\ket{0}_{T}\right)\ket{0}_{B}\ket{\psi}_{Q}\ket{0}_{A}\ket{0}_{O}\ket{1}_{S}\ket{0}_{M}\\
+    &=\frac{1}{\sqrt{2^{n}}}\sum_{m}D_{3}\ket{a}_{R}\sum_{r\perp a}\ket{r}_{B}\left(\sum_{i}\Pi_{i}^{(r,m)}\ket{\psi}_{Q}\ket{0}_{A}\ket{i}_{O}\right)\ket{0}_{T}\ket{1}_{S}\ket{m}_{M}\\
+    &=\frac{1}{\sqrt{2^{n}}}\sum_{m}\ket{a}_{R}\sum_{r\perp a}\ket{r}_{B}\left(\sum_{i}(-1)^{i}\Pi_{i}^{(r,m)}\ket{\psi}_{Q}\ket{0}_{A}\ket{i}_{O}\right)\ket{0}_{T}\ket{1}_{S}\ket{m}_{M}
+\end{align} and \begin{align}
+    &D_{4}^{\dagger}D_{5}^{\dagger}\ket{a}_{R}\ket{x_{0}}_{B}\ket{0}_{B}\ket{\psi}_{Q}\ket{0}_{A}\ket{0}_{O}\ket{r\cdot a}_{T}\ket{1}_{S}\ket{0}_{M}\\
+    &=\frac{1}{\sqrt{2^{n}}}D_{4}^{\dagger}\ket{a}_{R}\sum_{r}\ket{r}_{B}\left((-1)^{x_{0}\cdot z}\ket{\psi}_{Q}\ket{0}_{A}\ket{0}_{O}\right)\ket{r\cdot a}_{T}\ket{1}_{S}\ket{0}_{M}\\    &=\frac{1}{\sqrt{2^{n}}}\ket{a}_{R}\sum_{r}\ket{r}_{B}\left(\sum_{i}(-1)^{x_{0}\cdot z}\Pi_{i}^{(r,m)}\ket{\psi}_{Q}\ket{0}_{A}\ket{i}_{O}\right)\ket{r\cdot a}_{T}\ket{1}_{S}\ket{m}_{M}
+\end{align} Then the inner product equals to
+\begin{align}&\bra{a_{R},(x_{0})_{B},\psi_{Q},0_{A},0_{O},0_{T},1_{S}}C_{x|x_{0}\oplus x_{1}}\ket{a_{R},0_{B},\psi_{Q},0_{A},0_{O},0_{T},1_{S}}\\
+&=\frac{1}{2^{n}}\sum_{i,m}\sum_{r\perp a}(-1)^{i}(-1)^{r\cdot x_{m}}\lVert \Pi^{(r,m)}_{i}\ket{\psi}_{Q}\ket{0}_{A} \rVert^{2}\\
+&=\frac{1}{2^{n}}\sum_{i,m}\sum_{r\perp a}\sum_{d}(-1)^{i}(-1)^{\hat{c}_{m}(r,d)}\lVert \Pi^{(r,d,m)}_{i}\Pi^{r}_{d}\ket{\psi}_{Q}\ket{0}_{A} \rVert^{2}\\
+&=\frac{1}{2^{n}}\sum_{i,m}\sum_{r\perp a}\sum_{d}\lVert \Pi^{(r,d,m)}_{\hat{c}_{m}(r,d)}\Pi^{r}_{d}\ket{\psi}_{Q}\ket{0}_{A}\rVert^{2}-\lVert\Pi^{(r,d,m)}_{\neg\hat{c}_{m}(r,d)}\Pi^{r}_{d}\ket{\psi}_{Q}\ket{0}_{A} \rVert^{2}\\
+&=\frac{1}{2}\sum_{i}\left(2\lVert Q_{i}\ket{\tilde{\psi}_{x_{0}\oplus x_{1}}}\rVert^{2}-1\right)\\
+&=p_{0|x_{0}\oplus x_{1}}+p_{1|x_{0}\oplus x_{1}}-1\end{align} By lemma \ref{lemma3}, this inner product is greater than $4\varepsilon'$, and conditioned on measure $0$ in the $T$ register this happens with probability $2\sqrt{2}\varepsilon'$. The symmetric case for $x_{1}$ is the same. Since $\braket{a|b}=0$ for $a\neq b$, and we are considering the inner product of two state, we only care about the part of $\ket{\psi_{\mathrm{err}}}$ which is of the form $\ket{a}\ket{\psi'_{\mathrm{err}}}_{QA}$. Since $\Pi_{i}^{(r,m)}$ act as an orthogonal projection, \begin{align}\left|\bra{\psi'}_{QA}\Pi_{i}^{(r,m)} \Pi_{i}^{(r,m)}\ket{\psi}_{Q}\ket{0}_{A}\right|^{2}\leq \left|\bra{\psi'}_{QA} \ket{\psi}_{Q}\ket{0}_{A}\right|^{2}=0\end{align} We can conclude that \begin{align}
+    \bra{a_{R},(x_{0})_{B},\psi_{Q},0_{A},0_{O},0_{T},1_{S},0_{M}}C_{x|x_{0}\oplus x_{1}}C_{x_{0}\oplus x_{1}}\ket{0_{R},0_{B},\psi_{Q},0_{A},0_{O},0_{T},1_{S},0_{M}}=4\varepsilon\varepsilon'
+\end{align} This implies that in order to compute the claw of $y$, we input the state $\ket{0_{R},0_{B},\psi_{Q},0_{A},0_{O},0_{T},1_{S}}$ into the circuit $C_{x|x_{0}\oplus x_{1}}C_{x_{0}\oplus x_{1}}$, and then measure the $R$ and $B$ registers of the result in the computational basis. From which we obtain $x_{0}$ or $x_{1}$, and $x_{0}\oplus x_{1}$ with probability $32\varepsilon^{2} \varepsilon'^{2}$. We can then compute $x_{1} = x_{0} \oplus (x_{0}\oplus x_{1})$, or $x_{0} = x_{1} \oplus (x_{0}\oplus x_{1})$. Hence, we can compute the claw with probability $32\varepsilon^{2}\varepsilon'^{2}$ using a polynomial-time circuit.
+
+\subsection{Certifiable randomness from the Effective Anticommutator}
+As a corollary of the previous section, for good $y$'s (i.e. with probability at least $4\varepsilon$), $p_{\mathrm{xor}}=\frac{1}{2}+\mu(n)$ for some negligible $\mu$.
+If we map the binary projector $Q_{0}$ and $Q_{1}$ to their binary observable representation $A\mapsto 2A - \mathbb{I}$,
+\begin{align}
+  \{2Q_{0}-\mathbb{I},2Q_{1}-\mathbb{I}\}&=(2Q_{0}-\mathbb{I})(2Q_{1}-\mathbb{I}) + (2Q_{1}-\mathbb{I})(2Q_{0}- \mathbb{I})\\&= 4\{Q_{0},Q_{1}\} - 4(Q_{0}+Q_{1}) + 2\mathbb{I}\\
+    \left<\{2Q_{0}-\mathbb{I},2Q_{1}-\mathbb{I}\}\right>_{\tilde{\psi}}&= 4(p_{\mathrm{xor}} - 1) + 2 = 4p_{\mathrm{xor}}-2\\
+    &=4\mu
+    \end{align}
+The state $\ket{\tilde{\psi}}$ can be written as a quantum-classical states
+\begin{align}
+    \rho = \sum_{t}\rho_{t} \otimes \ket{t}\bra{t}
+\end{align} Let $X$ be the register that stores the of $Q_{m}$, $M\in\{0,1\}$ be the observable chosen and $T$ be the the register that stores the transcript of the protocol. Following the result of \cite{Kaniewski_2016},
+\begin{align}
+    p_{\mathrm{guess}}(X|T) \leq \frac{1}{2} + \frac{1}{2}\sqrt{\frac{1 + 4\mu}{2}}
+\end{align}
+Therefore, \begin{align}
+    H_{\mathrm{min}}(X|T) \geq -\log\left(\frac{1}{2} + \frac{1}{2}\sqrt{\frac{1+4\mu}{2}}\right).
+\end{align} Since $X=\Pr(c_{m}=\hat{c}_{m})$ exhibits at least min-entropy as $c_{m}$ we have proved our main result.
+
+\begin{thm}[Certifiable Randomness]
+For any quantum prover that achieves $\frac{3}{4}+\varepsilon(n)$ success probability in protocol \ref{protocol} for some non-negligible $\varepsilon$, let $O$ be the final of the bit of prover in the protocol and let $T$ be the transcript of the protocol (up to $O$), then with probability at least $4\varepsilon(n)$,
+\begin{align}
+    H_{\mathrm{min}}(O|T) \geq -\log \cos^{2}(\pi/8) - \mathrm{negl}(n)
+\end{align}
+\end{thm}
+% \subsection{Work In Progress}
+% \begin{align}
+%     \{2Q_{0}-\mathbb{I},2Q_{1}-\mathbb{I}\}&=(2Q_{0}-\mathbb{I})(2Q_{1}-\mathbb{I}) + (2Q_{1}-\mathbb{I})(2Q_{0}- \mathbb{I})\\&= 4\{Q_{0},Q_{1}\} - 4(Q_{0}+Q_{1}) + 2\mathbb{I}\\
+%     &= 4(p_{\mathrm{xor}} - 1) + 2 = 4p_{\mathrm{xor}}-2\\
+%     &=4\mu
+%     \end{align}
+% Hence, $H(Q_{0}) + H(Q_{1}) \geq h_{\mathrm{bin}}\left(\frac{1+\sqrt{4|\mu|}}{2}\right)\approx 1$
+
+% % \section{Description of a variant of the protocol}
+% % Credit, credit, credit! We analyse a different variant of randomness which we found to be simpler for the analysis of extracting certifiable randomness. The protocol consists of three rounds of interaction between the prover (quantum) and verifier (classical). 
+
+% % Let $n$ be a security parameter. The quantum states are normalized, but for simplicity are written as non-normalized. The protocol is defined as follows:
+
+% % Let $C_{k}$ be the set of claws, i.e. $\{(x_{0},x_{1}) \in X_{k}^{2} : f_{k}(x_{0})=f_{k}(x_{1})\}$.
+% % \begin{enumerate}
+% %     \item (\emph{verifier}) samples $(k,t_{k})\leftarrow \mathrm{Gen}(1^{n})$ and sends $k$ to the prover.
+% %     \item (\emph{prover}) generates a state $\sum_{(x_{0},x_{1})\in C_{k}}{(\ket{x_{0},0^{n}} + \ket{0^{n}, x_{1}})_{\mathrm{x}} \ket{f_{k}(x_{0})}_{\mathrm{y}}}$
+% %     \item (\emph{prover}) measures the $\mathrm{y}$ register, yielding a bitstring $y$. The state is now $(\ket{0^{n},x_{0}}_{\mathrm{x}}+\ket{x_{1},0^{n}}_{\mathrm{x}})\ket{y}_{\mathrm{y}}$; $\mathrm{y}$ register can be discarded. The prover sends $y$ to the verifier.
+% %     \item (\emph{verifier}) uses trapdoor $t_{k}$ and computes $x_{0}$ and $x_{1}$.
+% %     \item (\emph{verifier}) chooses a random bitstring $r=r_{0}||r_{1}\in \{0,1\}^{2n}$ and sends it to the prover.
+% %     \item (\emph{prover}) adds one ancilla $\mathrm{b}$; uses $\mathrm{CNOT}$ to compute $\ket{r_{0}\cdot x_{0}}\ket{x_{0},0^{n}}_{\mathrm{x}}+\ket{r_{1}\cdot x_{1}}\ket{0^{n},x_{1}}_{\mathrm{x}}$.
+% %     \item (\emph{prover}) measures the $\mathrm{x}$ register in the Hadamard basis, yielding a string $d=d_{0}||d_{1}$. Discard $\mathrm{x}$, state is now $\ket{\psi}_{\mathrm{b}}\in\{\ket{0},\ket{1},\ket{+},\ket{-}\}$. The prover sends $d$ to the verifier. \label{hb}
+% %     \item (\emph{verifier}) determines $\ket{\psi}_{\mathrm{b}}$ using $r,x_{0},x_{1},d$.
+% %     \item (\emph{verifier}) chooses a random $m\in \{0, 1\}$ and sends it to the prover.
+% %     \item (\emph{prover}) measures ancilla $\mathrm{b}$ in the rotated basis \begin{align*}\left\{\cos\left(\frac{(-1)^{m}\pi}{8}\right)\ket{0}+\sin\left(\frac{(-1)^{m}\pi}{8}\right)\ket{1}, \cos\left(\frac{(-1)^{m}\pi}{8}\right)\ket{1}-\sin\left(\frac{(-1)^{m}\pi}{8}\right)\ket{0}\right\}\end{align*}  yielding a bit $b$. The prover sends $c=(-1)^{b}$ to the verifier.
+% %     \item (\emph{verifier}) returns $\mathrm{Accept}$ if $c$ was likely given $\ket{\psi}_{b}$. 
+% % \end{enumerate}
+
+% \subsection{Correctness and Soundness}
+% \begin{thm}[Correctness of the New Protocol] An honest prover achieves a success probability of $\cos^{2}(\pi/8)$ in the new protocol.
+% \end{thm} \textbf{Proof.} An honest prover generates the state $\sum_{(x_{0},x_{1})\in C_{k}}{(\ket{x_{0},0^{n}} + \ket{0^{n}, x_{1}})_{\mathrm{x}} \ket{f_{k}(x_{0})}_{\mathrm{y}}}$. He then measures the $y$ register, yielding a bitstring $y$ and the state $\ket{0^{n},x_{0}}_{\mathrm{x}}+\ket{x_{1},0^{n}}_{\mathrm{x}}$. After applying a CNOT the state is $\ket{r_{0}\cdot x_{0}}\ket{x_{0},0^{n}}_{\mathrm{x}}+\ket{r_{1}\cdot x_{1}}\ket{0^{n},x_{1}}_{\mathrm{x}}$. After applying a Hadamard transformation the state is
+% \begin{align}\sum_{d} (-1)^{d_{0}\cdot x_{0}}\ket{r_{0}\cdot x_{0}}\ket{d}_{\mathrm{x}}+(-1)^{d_{1}\cdot x_{1}}\ket{r_{1}\cdot x_{1}}\ket{d}
+% \end{align} After measuring $d$ the state is \begin{align}
+%     (-1)^{d_{0}\cdot x_{0}}\ket{r_{0}\cdot x_{0}}+(-1)^{d_{1}\cdot x_{1}}\ket{r_{1}\cdot x_{1}} = \ket{r_{0}\cdot x_{0}}+(-1)^{d\cdot (x_{0}||x_{1})}\ket{r_{1}\cdot x_{1}} 
+% \end{align} $\hat{c}$ takes a similar form to the previous formula. We denote $\alpha = r_{0}\cdot x_{0}\oplus r_{1}\cdot x_{1} = r\cdot (x_{0}||x_{1})$ and $\beta = d_{0}\cdot x_{0} \oplus d_{1}\cdot x_{1} = d\cdot (x_{0}||x_{1})$
+% \begin{align}
+%     \hat{c}(r,x_{0},x_{1},d,m)=(1-\alpha)\cdot (-1)^{r_{0}\cdot x_{0}} + \alpha (-1)^{\beta} \cdot (-1)^{m}
+% \end{align} and by the same argument as before, the prover achieves a success probability of $\cos^{2}(\pi/8)$.
+% \begin{thm}[Soundness of the New Protocol]
+% A classical prover can achieve a success probability of at most $\frac{3}{4}+\mu(n)$ for some negligible $\mu$, in the new protocol.
+% \end{thm} \textbf{Proof.} The proof follows directly from the proof of theorem \ref{xorrecovery}, we can recover with high probability the string $(x_{0}||0^{n})\oplus (0^{n}||x_{1}) = x_{0}||x_{1}$ in polynomial-time, from which it is immediate to recover $x_{0}$ and $x_{1}$.
+
+% \subsection{Formalizing the Observables}
+% We define measurements in the following way. Given $r\in \{0,1\}^{n}$ the prover measures $d$ and applies a measurement depending on $m$. Let $\ket{\psi}$ be the state of the prover after sending $y$ to the verifier, fix $x_{0}$ and $x_{1}$. There exist two sets of measurements $\{\Pi_{0,i}^{(r,d)}\}_{r,d,i}$ and $\{\Pi_{0,j}^{r}\}_{r,d,j}$. By Naimark's dilation theorem, the unitaries the prover applies are \begin{align}U_{0}\ket{r}\ket{\psi}\ket{0^{t}}\ket{0}_{A} = \sum_{d}\ket{r,d}(\Pi_{0,0}^{(r,d)}\ket{\psi}\ket{0^{s}})\ket{0}_{A}+\ket{r,d}(\Pi_{0,1}^{(r,d)}\ket{\psi}\ket{0^{s}})\ket{1}_{A}\end{align} and \begin{align}U_{1}\ket{r}\ket{\psi}\ket{0^{t}}\ket{0}_{B} =  \sum_{d}\ket{r,d}(\Pi_{1,0}^{(r,d)}\ket{\psi}\ket{0^{s}})\ket{0}_{B}+(\ket{r,d}\Pi_{1,1}^{(r,d)}\ket{\psi}\ket{0^{s}})\ket{1}_{B}\end{align} We describe an experiment, choose $r\in \{0,1\}^{n}$ uniformly at random, measure $d$ and finally output a bit $c_{m}$, we call this the $m$-experiment. The success rate for the $m$-experiment is \begin{align}
+% p_{m}=\frac{1}{2^{n}}\sum_{r,d}\left\lVert\Pi_{m,\hat{c}_{m}(r,d)}^{(r,d)}\ket{\psi}\ket{0^{s}}\right\rVert^{2}
+% \end{align} All projectors can be made orthogonal and also disjoint hence the success rate is \begin{align}
+% p_{m}=\frac{1}{2^{n}}\left\lVert\sum_{r,d}\Pi_{m,\hat{c}_{m}(r,d)}^{(r,d)}\ket{\psi}\ket{0^{s}}\right\rVert^{2}
+% \end{align} If we define $\Pi_{m}=\sum_{r}\ket{r}\bra{r}\otimes \sum_{d}\Pi_{m,\hat{c}_{m}(r,d)}^{(r,d)}$, and we let $\ket{\tilde{\psi}}=\frac{1}{\sqrt{2^{n}}}\sum_{r}\ket{r}\ket{\psi}\ket{0^{s}}$ then the success rate for the $m$ experiment is \begin{align}p_{m}=\lVert \Pi_{m} \ket{\tilde{\psi}}\rVert^{2}\end{align}
+% The probability that the adversary passes the protocol is given by \begin{align}\frac{1}{2}(p_{0}+p_{1})=\frac{1}{2}\lVert \Pi_{0} \ket{\tilde{\psi}}\rVert^{2} + \frac{1}{2}\lVert \Pi_{1} 
+\subsection{Jordan Decomposition of the Operators} 
+Let $p_{r,d}$ be the probability of measuring $r$ and then $d$ on the state $\ket{\tilde{\psi}}$. The success probability for experiment $m$, $p_{m}$ can be now written as \begin{align}
+    p_{m} &= \sum_{r,d}\lVert \Pi_{\hat{c}_{m}(r,d)}^{(r,d,m)}\Pi_{d}^{r}\ket{\psi}\rVert^{2}
+\end{align} Fix some $r,d\in \{0,1\}^{n}$. Consider the projectors binary projectors $\Pi_{0}^{(r,d,0)}$ and $\Pi_{0}^{(r,d,1)}$. By Jordan's Lemma we can decompose our Hilbert space into 1-dimensional or 2-dimensional sub-spaces that are invariant under the projections, namely $S_{i}$. 
+
+Consider the 2-dimensional case, and the normalized projection of the state $\Pi_{d}^{r}\ket{\psi}\ket{0^{t}}$ onto the subspace $S_{i}$, $\ket{u_{i}}=\mathrm{proj}_{S_{i}}\Pi_{d}^{r}\ket{\psi}\ket{0^{t}}$. There exists a state in $S_{i}$ which is orthogonal to $\ket{u_{i}}$, denote it by $\ket{u^{\perp}_{i}}$. We can view $\ket{u_{i}},\ket{u^{\perp}_{i}}$ as a basis for $S_{i}$ in which $\Pi_{\hat{c}_{0}(r,d)}^{(r,d,0)}$ and $\Pi_{\hat{c}_{1}(r,d)}^{(r,d,1)}$ take the form \begin{align}\begin{pmatrix}
+\cos^{2}(\alpha_{i}) & \cos(\alpha_{i})\sin(\alpha_{i})\\
+\cos(\alpha_{i})\sin(\alpha_{i}) & \sin^{2}(\alpha_{i})
+\end{pmatrix}\text{ and }\begin{pmatrix}
+\cos^{2}(\beta_{i}) & \cos(\beta_{i})\sin(\beta_{i})\\
+\cos(\beta_{i})\sin(\beta_{i}) & \sin^{2}(\beta_{i})
+\end{pmatrix}\end{align} respectively, for some $\alpha_{i},\beta_{i}\in [0,\pi)$. 
+Let $t_{i}=\left|\braket{u_{i}|\Pi_{d}^{r}\ket{\psi}\ket{0^{t}}}\right|^{2}+\left|\braket{u^{\perp}_{i}|\Pi_{d}^{r}\ket{\psi}\ket{0^{t}}}\right|^{2}$. Then, \begin{align}
+    p_{0} &= \sum_{i}t_{i}\cos^{2}(\alpha_{i})\\
+    p_{1} &=\sum_{i}t_{i}\cos^{2}(\beta_{i})
+\end{align}
+We can express the success probability that the adversary passes the protocol using the new notation, \begin{align}p_{0}+p_{1}&=\sum_{i}t_{i}(\cos^{2}(\alpha_{i})+\cos^{2}(\beta_{i}))\end{align} and \begin{align}p_{\mathrm{xor}}&=\sum_{i}t_{i}\cos^{2}(\alpha_{i}-\beta_{i})\end{align}
+
+% \subsection{Measuring the XOR}
+% For a given $r,d$, the measurements $\{\Pi_{0,i}^{(r,d)}\}_{i}$ and $\{\Pi_{1,i}^{(r,d)}\}_{i}$ don't necessarily compute and therefore we cannot measure them simultaneously. What we can do is to apply $U_{0}$ and $U_{1}$ one after another on $\ket{\psi}$. The state after applying both unitary operators is
+% \begin{align}
+% U_{0}U_{1}\ket{r}\ket{\psi}\ket{0^{t}}=\sum_{i,j}\ket{i,j}\Pi_{1,i}^{(r)}\Pi_{0,i}^{(r)}\ket{\psi}\ket{0^{s}}
+% \end{align} The success rate of measuring the exclusive $\hat{c}_{0}(r,d)\oplus \hat{c}_{1}(r,d)=(r_{0}\cdot x_{0}) \oplus (r_{1}\cdot x_{1}) = r \cdot (x_{0} || x_{1})$ by applying $U_{0}U_{1}$ and then computing the xor of the $A$ and $B$ registers is given by,
+% \begin{align}
+% \label{pxor}
+% p_{\mathrm{xor}}=\lVert(\Pi_{0}\Pi_{1}+(\mathbb{I}-\Pi_{0})(\mathbb{I}-\Pi_{1}))\ket{\tilde{\psi}}\rVert^{2}
+% \end{align} because $a\oplus b = \hat{c}_{0}\oplus \hat{c}_{1}$ iff either $(a,b)=(\hat{c}_{0},\hat{c}_{1})$ or $(a,b)=(\hat{c}_{0}\oplus 1, \hat{c}_{1}\oplus 1)$.
+% Therefore,
+% \begin{align}
+% p_{\mathrm{xor}}&=\sum_{i}\left|\braket{u_{i}|v_{i}}\right|^{2}\left|\braket{v_{i}|\tilde{\psi}}\right|^{2}+\left(\left|\braket{u^{\perp}_{i}|v_{i}}\right|^{2}\right)\left(\left|\braket{v^{\perp}_{i}|\tilde{\psi}}\right|^{2}\right)\\&= \sum_{i} t_{i} \left(\cos^{2}(a_{i}-b_{i})\cos^{2}(a_{i})+\sin^{2}(a_{i}-b_{i})\sin^{2}(a_{i})\right)
+% \end{align}
+
+% \begin{lem}
+% \label{lemmaxor}
+% Any polynomial-time computable operators $U_{0}$ and $U_{1}$ as described in equations [37, 38], cannot achieve $p_{\mathrm{xor}}\geq \frac{1}{2}+\varepsilon(n)$ for some noticable $\varepsilon$.
+% \end{lem} \textbf{Proof.} Let $T^{(A,B)}_{C}$ be the Tofolli gate with control qubits $A,B$ and output qubit $C$. We define the circuit $T_{C}^{(A,B)}U_{0}U_{1}$ which takes $\ket{r}$ as input and $\ket{\psi}\ket{0}_{A}\ket{0}_{B}$ as auxilliary input and $\ket{0}_{C}$ is the output register. By inequality \ref{xor} and Theorem \ref{qgl}, we can compute $x_{0}||x_{1}$ with high probability (noticable) in polynomial-time, in contradiction to the claw-free property of the TCF family.
+
+
+\subsection{Compatible Operators}
+\begin{lem}
+\label{compatible}
+Let $U_{0}$ and $U_{1}$ be the polynomial-time computable operators that were described previously, and suppose $U_{0}$ and $U_{1}$ commute. Then, $p_{0}+p_{1} \leq \frac{3}{2}+\mu(n)$ for some negligible $\mu$.
+\end{lem} \textbf{Proof.} If $U_{0}$ and $U_{1}$ are measuring compatible observables then $\Pi_{\hat{c}_{0}(r,d)}^{(r,d,0)}$ and $\Pi_{\hat{c}_{1}(r,d)}^{(r,d,1)}$ commute and $\alpha_{i}=\beta_{i}$ or $|\alpha_{i}-\beta_{i}|=\frac{\pi}{2}$. Let $I_{0}$ be the set of $i$ values such that $\alpha_{i}=\beta_{i}$ and $I_{1}$ be the set of $i$ values such that $|\alpha_{i}-\beta_{i}|=\frac{\pi}{2}$. \begin{align}
+    p_{0} + p_{1} = \sum_{i\in I_{0}}{2t_{i}\cos^{2}(\alpha_{i})} + \sum_{i\in I_{1}}t_{i}
+\end{align}
+while on the other hand,
+\begin{align}
+    p_{\mathrm{xor}} = \sum_{i\in I_{0}}t_{i} 
+\end{align}
+We have \begin{align}
+    p_{\mathrm{xor}} &= 1 + \sum_{i\in I_{0}}{2t_{i}\cos^{2}(\alpha_{i})} - p_{0} - p_{1} \geq 1+2(1-p_{\mathrm{xor}})-(p_{1}+p_{2})\\
+    \therefore p_{\mathrm{xor}} &\geq 1 - \frac{1}{3}p_{0}-\frac{1}{3}p_{1}
+\end{align}
+Suppose $p_{0}+p_{1} \geq \frac{3}{2} + \varepsilon$, then $p_{\mathrm{xor}}\geq \frac{1}{2}+\frac{\varepsilon}{3}$. By theorem \ref{maintheorem}, we can compute the claws with non-negligible probability, in contradiction to the computational assumption.
+
+\subsection{Quantum Soundness}
+\begin{lem}
+\label{qsoundness}
+Let $U_{0}$ and $U_{1}$ be the polynomial-time operator as before, and let $p_{0}$ and $p_{1}$ be the success probabilities. Then, $p_{0}+p_{1} \leq 2\cos^{2}(\pi/8)+\mu(n)$ for some negligible $\mu$.
+\end{lem} \textbf{Proof.} Define the function 
+\begin{align}
+    f(\alpha, \beta)=\left(\frac{\cos^{2}(\alpha)+\cos^{2}(\beta)}{2} - \cos^{2}(\pi / 8)\right) - \sqrt{2}\left(\cos^{2}(\alpha-\beta)-\frac{1}{2}\right)
+\end{align}
+It holds that $\max_{\alpha, \beta}f(\alpha, \beta)=0$. Therefore,
+\begin{align}
+    \cos^{2}(\alpha-\beta)-\frac{1}{2} \geq \frac{1}{\sqrt{2}}\left(\frac{\cos^{2}(\alpha)+\cos^{2}(\beta)}{2} - \cos^{2}(\pi / 8)\right)
+\end{align}
+Therefore, \begin{align}
+    p_{\mathrm{xor}}-\frac{1}{2}\geq \frac{1}{\sqrt{2}}(p_{0}+p_{1}-\cos^{2}(\pi/8))
+\end{align}
+Assume the contra-positive that for some polynomial-time operators, $U_{0},U_{1}$, \begin{align}p_{0}+p_{1} = \cos^{2}(\pi/8) + \varepsilon,\end{align}then by the equation above \begin{align}
+    p_{\mathrm{xor}}\geq \frac{1}{2} + \frac{\varepsilon}{\sqrt{2}}
+\end{align} By theorem \ref{maintheorem}, there exists a polynomial time circuit that can compute claws with constant probability, in contradiction to the computational assumption.
+% \section{Lazy way :)}
+
+% Define the operators for Alice \begin{align}
+%     A_{0} = X & \quad 
+%     A_{1} = Z.
+% \end{align} and for Bob \begin{align}
+%     B_{0} = 2Q_{0}-\mathbb{I} & \quad
+%     B_{1} = 2Q_{1}-\mathbb{I}.
+% \end{align} 
+% Consider the bipartite state which is prepared by applying a controlled $B_{0}$ and a controlled $B_{1}$ \begin{align}
+%     \ket{\phi} &= \frac{1}{\sqrt{2}}\ket{0}_{A}B_{0}\ket{\tilde{\psi}}_{B} + \frac{1}{\sqrt{2}}\ket{1}B_{1}\ket{\tilde{\psi}}_{B}
+% \end{align}
+% We model the stategy for the CHSH game as a triple $\mathcal{S}=(\ket{\phi}, (A_{0}, A_{1}), (B_{0}, B_{1}))$. We wish to calculate the bias of the stategy, \begin{align}
+%     \beta^{*}_{\mathrm{CHSH}}(\mathcal{S}) = \frac{1}{4}\sum_{x,y\in\{0,1\}}{(-1)^{x\wedge y} \braket{\phi|A_{x}\otimes B_{y}| \phi}}.
+% \end{align} We calculate each term separately
+% \begin{align}
+%     \braket{\phi |A_{0}\otimes B_{0} | \phi} &= \frac{1}{2}\lVert B_{1}\ket{\tilde{\psi}}\rVert^{2} + \frac{1}{2}\lVert B_{0}B_{1}\ket{\tilde{\psi}}\rVert^{2}\\
+%     \braket{\phi |A_{0}\otimes B_{1} | \phi} &=  \frac{1}{2}\lVert B_{0}\ket{\tilde{\psi}}\rVert^{2} + \frac{1}{2}\lVert B_{1}B_{0}\ket{\tilde{\psi}}\rVert^{2}\\
+%     \braket{\phi |A_{1}\otimes B_{0} | \phi} &=  \frac{1}{2} - \frac{1}{2}\lVert B_{1}B_{0}\ket{\tilde{\psi}}\rVert^{2}\\
+%     \braket{\phi |A_{1}\otimes B_{1} | \phi} &=  \frac{1}{2}\lVert B_{0}B_{1}\ket{\tilde{\psi}}\rVert^{2} - \frac{1}{2}
+% \end{align} 
+% Now we calculate the bias of the startegy, \begin{align}
+%     \beta^{*}_{\mathrm{CHSH}}(\mathcal{S}) = \frac{1}{4} + \frac{1}{8}(\lVert B_{0}\ket{\tilde{\psi}}\rVert^{2} + \lVert B_{1}\ket{\tilde{\psi}}\rVert^{2})
+% \end{align}
+% Needs to learn about entropic uncertainty bounds
+% By lemma \ref{lemmaxor}, we can assume that $p_{\mathrm{xor}} \leq \frac{1}{2}+\mu(n)$ for some negligible $\mu(n)$. Assume that $p_{0}+p_{1}\geq \frac{3}{4}+\varepsilon(n)$ for some noticeable $\varepsilon$. Then,
+% \begin{align}
+%     \sum_{i} t_{i}(\cos^{2}(a_{i})+\cos^{2}(b_{i})) \cos^{2}(a_{i}-b_{i}) + \sum_{i} t_{i}(\sin^{2}(a_{i})+\sin^{2}(b_{i})) \sin^{2}(a_{i}-b_{i}) \leq \frac{1}{2} + \mu(n)
+% \end{align}
+% And
+% \begin{align}
+%     \sum_{i} t_{i}(\cos^{2}(a_{i})+\cos^{2}(b_{i})) \geq \frac{3}{2} + 2\varepsilon(n)
+% \end{align} Let $J_{r}$ be the indices associated with a specific measurement of $r$. Let \begin{align}X_{r}=\frac{1}{2}\frac{\sum_{j\in J_{r}} t_{j}(\cos^{2}(a_{j})+\cos^{2}(b_{j}))}{\sum_{j\in J_{r}}t_{j}}.\end{align} Let $X$ be a random variable taking the value of $X_{r}$ with probability $\sum_{j\in J_{r}} t_{j}$. Then, \begin{align}
+%     \mathbb{E}[X] = \mathbb{E}_{r}[X_{r}]\geq \frac{3}{4}+\varepsilon(n)
+% \end{align} Similarly, define \begin{align}
+%         Y_{r} = \frac{\sum_{j \in J_{r}} t_{j}\left((\cos^{2}(a_{j})+\cos^{2}(b_{j})) \cos^{2}(a_{j}-b_{j}) + (\sin^{2}(a_{j})+\sin^{2}(b_{j})) \sin^{2}(a_{j}-b_{j})\right)}{\sum_{j \in J_{r}} t_{j}}\end{align} Then,
+% \begin{align}
+%     \mathbb{E}[Y] = \mathbb{E}_{r}[Y_{r}]\leq \frac{1}{2}+\mu(n)
+% \end{align}
+% By lemma \ref{markovlemma}, \begin{align}
+%     \Pr_{r}(X_{r}\geq x_{0})\geq \frac{\frac{3}{4}+\varepsilon(n) - x_{0}}{1-x_{0}}
+% \end{align} Similarly, \begin{align}
+%     \Pr_{r}(Y_{r}\leq y_{0})\geq \frac{y_{0}-\frac{1}{2}-\mu(n)}{y_{0}}
+% \end{align} Then, \begin{align}
+%     \Pr_{r}(X_{r} \geq x_{0} \wedge Y_{r} \leq y_{0}) \geq \frac{\frac{3}{4}+\varepsilon(n) - x_{0}}{1-x_{0}} + \frac{y_{0}-\frac{1}{2}}{y_{0}} - 1.
+% \end{align} Note that by inequality 60, If $X_{r} \geq x_{0}$, then $Y_{r} \geq 2x_{0} - \frac{1+\sqrt{2}}{2}$. Thus, \begin{align}
+%     \Pr_{r}\left(2x_{0} - \frac{1+\sqrt{2}}{2} \leq Y_{r} \leq y_{0}\right) \geq \frac{\frac{3}{4}+\varepsilon(n) - x_{0}}{1-x_{0}} + \frac{y_{0}-\frac{1}{2}}{y_{0}} - 1.
+% \end{align}
+% Choosing $y_{0} = 1-\delta$ and $x_{0} = \frac{1+\sqrt{2}}{4} + \frac{\delta}{2}$, \begin{align}
+%     \Pr_{r}\left(\delta \leq Y_{r} \leq 1-\delta \right) \geq \frac{2+4\varepsilon(n)-\sqrt{2}-2\delta}{3-\sqrt{2}-2\delta} + \frac{1-2\delta}{2-2\delta} - 1.
+% \end{align}
+% Can guarantee positive min-entropy for $\varepsilon(n) \geq \frac{1}{2}(\cos^{2}(\pi / 8) - \frac{3}{4})$ at most $\approx 0.18$ bits of min-entropy.
+% We have seen the the distribution of the two bits $A$ and $B$ given by applying $U_{0}U_{1}$ on the state $\ket{\tilde{\psi}}$ is given by
+% \begin{align}
+%     \Pr[A=0,B=0]&=\sum_{i}t_{i}\cos^{2}(a_{i})\cos^{2}(a_{i}-b_{i})\\
+%     \Pr[A=0,B=1]&=\sum_{i}t_{i}\cos^{2}(a_{i})\sin^{2}(a_{i}-b_{i})\\
+%     \Pr[A=1,B=0]&=\sum_{i}t_{i}\sin^{2}(a_{i})\cos^{2}(a_{i}-b_{i})\\
+%     \Pr[A=1,B=1]&=\sum_{i}t_{i}\sin^{2}(a_{i})\sin^{2}(a_{i}-b_{i})
+% \end{align} And so,
+% \begin{align}
+%     \Pr[B=0]&=\sum_{i}t_{i}\cos^{2}(a_{i}-b_{i})\\
+%     \Pr[B=1]&=\sum_{i}t_{i}\sin^{2}(a_{i}-b_{i})
+% \end{align} By the Cauchy-Schwartz Inequality,
+% \begin{align}
+%     \Pr[B=0]\leq\left|\braket{\tilde{\psi}|u}\right|^{2}\left|\braket{u|v}\right|^{2}\leq \cos^{2}(\pi/8)
+% \end{align}
+
+% \begin{align}
+%     \ket{u}\bra{u}\ket{v}\bra{v}\ket{u}\bra{u} + \ket{v}\bra{v}\ket{u}\bra{u}\ket{v}\bra{v}
+% \end{align}
+
+
+\section{Appendix A - Measuring an observable}
+We define the following procedure $\mathcal{M}(A)$ given any binary observable $A$ which takes as input $r\in \{0,1\}^{n}$, some auxilliary state $\ket{\psi}$ and some ancillary bits $\ket{0^{\otimes t}}$ in the following way
+\begin{align}\mathcal{M}(A) = HAH^{\dagger}\end{align} or in a circuit diagram, here $U$ is some unitary that takes as input $r\in \{0,1\}^{n}$, some auxilliary state $\ket{\psi}$ and some ancillary bits $\ket{0^{\otimes t}}$
+$$
+\Qcircuit @C=2em @R=2em {
+\lstick{\ket{0}_{O}}             & \gate{H}             & \ctrl{1}                    & \gate{H} &  \ \\
+\lstick{\ket{r}} & \qw  & \multigate{2}{A}         & \qw &  \\
+\lstick{\ket{\psi}}          & \qw                  & \ghost{U}                & \qw & \\
+\lstick{\ket{0^{\otimes t}}}         & \qw                  & \ghost{U_{0}}      & \qw\\ }
+$$
+% Now observe what happens to $\ket{\tilde{\psi}}$ under the transformation $T_{C}^{(A,B)}\mathcal{M}(U_{1})\mathcal{M}({U_{0}}))$. The circuit is as follows:
+% $$
+% \Qcircuit @C=2em @R=2em {
+% \lstick{\ket{0}_{A}}             & \gate{H}             & \ctrl{3}                    & \gate{H} & \qw & \qw & \qw & \ctrl{2} & \qw\\
+% \lstick{\ket{0}_{B}} & \qw & \qw & \qw & \gate{H} & \ctrl {2} & \gate{H} & \ctrl{1} & \qw\\
+% \lstick{\ket{0}_{C}} & \qw & \qw & \qw & \qw & \qw & \qw & \targ & \qw\\
+% \lstick{\ket{r}} & \qw  & \multigate{2}{U_{0}}   &  \qw & \qw & \multigate{2}{U_{1}} & \qw & \qw & \qw\\
+% \lstick{\ket{\psi}}          & \qw                  & \ghost{U_{0}}                & \qw  & \qw & \ghost{U_{1}} & \qw & \qw & \qw\\
+% \lstick{\ket{0^{\otimes t}}}         & \qw                  & \ghost{U_{0}}      & \qw & \qw & \ghost{U_{0}} & \qw & \qw & \qw\\ }
+% $$
+% We first assume all operations are not conditioned on the first qubit.
+% We introduce some notation: \begin{enumerate}
+%     \item $\ket{\phi_{0}}$ is the state after applying $H$ to the A register.
+%     \item $\ket{\phi_{1}}$ is the state after applying $U_{0}$ controlled on the A register.
+%     \item $\ket{\phi_{2}}$ is the state after applying $H$ to the A register.
+%     \item $\ket{\phi_{3}}$ is the state after applying $H$ to the B register.
+%     \item $\ket{\phi_{4}}$ is the state after applying $U_{1}$ controlled on the second register.
+%     \item $\ket{\phi_{5}}$ is the state after applying $H$ to the B register.
+%     \item $\ket{\phi_{6}}$ is the state after applying a Tofolli gate $T^{(A,B)}_{C}$ ($A$ and $B$ are controls and $C$ is the output qubit).
+% \end{enumerate} 
+% \begin{align}
+%     \ket{\phi_{0}} &= \frac{1}{\sqrt{2^{n}}}\ket{+_{A},0_{B},0_{C}}\sum_{r}\ket{r}\ket{\psi}\ket{0^{\otimes t}}\\
+%     \ket{\phi_{1}} &= \frac{1}{\sqrt{2^{n+1}}}\ket{0_{A},0_{B},0_{C}}\sum_{r}\ket{r}\ket{\psi}\ket{0^{\otimes t}} + \frac{1}{\sqrt{2^{n+1}}}\ket{1_{A},0_{B},0_{C}}\sum_{r}\ket{r}\left(\Pi_{0,0}^{(r)}-\Pi_{0,1}^{(r)}\right)\ket{\psi}\ket{0^{\otimes t}}\\
+%     \ket{\phi_{2}} &= \frac{1}{\sqrt{2^{n+1}}}\ket{0_{A},0_{B},0_{C}}\sum_{r}\ket{r}\Pi_{0,0}^{(r)}\ket{\psi}\ket{0^{\otimes t}} + \frac{1}{\sqrt{2^{n+1}}}\ket{1_{A},0_{B},0_{C}}\sum_{r}\ket{r}\Pi_{0,1}^{(r)}\ket{\psi}\ket{0^{\otimes t}}\\
+%     \ket{\phi_{3}}  &= \frac{1}{\sqrt{2^{n+1}}}\ket{0_{A},+_{B},0_{C}}\sum_{r}\ket{r}\Pi_{0,0}^{(r)}\ket{\psi}\ket{0^{\otimes t}} + \frac{1}{\sqrt{2^{n+1}}}\ket{1_{A},+_{B},0_{C}}\sum_{r}\ket{r}\Pi_{0,1}^{(r)}\ket{\psi}\ket{0^{\otimes t}}\\
+%     \ket{\phi_{4}}  &=\frac{1}{\sqrt{2^{n+2}}}\ket{0_{A},0_{B},0_{C}}\sum_{r}\ket{r}\left(\Pi_{1,0}^{(r)}+ \Pi_{1,1}^{(r)}\right)\Pi_{0,0}^{(r)}\ket{\psi}\ket{0^{\otimes t}}\\&+ \frac{1}{\sqrt{2^{n+2}}}\ket{1_{A},0_{B},0_{C}}\sum_{r}\ket{r}\left(\Pi_{1,0}^{(r)} + \Pi_{1,1}^{(r)}\right)\Pi_{0,1}^{(r)}\ket{\psi}\ket{0^{\otimes t}}\\
+%     &+\frac{1}{\sqrt{2^{n+2}}}\ket{0_{A},1_{B},0_{C}}\sum_{r}\ket{r}\left(\Pi_{1,0}^{(r)} - \Pi_{1,1}^{(r)}\right)\Pi_{0,0}^{(r)}\ket{\psi}\ket{0^{\otimes t}} \\&+ \frac{1}{\sqrt{2^{n+2}}}\ket{1_{A},1_{B},0_{C}}\sum_{r}\ket{r}\left(\Pi_{1,0}^{(r)} - \Pi_{1,1}^{(r)}\right)\Pi_{0,1}^{(r)}\ket{\psi}\ket{0^{\otimes t}}\\
+%     \ket{\phi_{5}} &= \frac{1}{\sqrt{2^{n+2}}}\sum_{i,j}\ket{i_{A},j_{B},0_{C}}\sum_{r}\ket{r}\Pi^{(r)}_{1,j}\Pi^{(r)}_{0,i}\ket{\psi}\ket{0^{\otimes {t}}}\\
+%     \ket{\phi_{6}} &= \frac{1}{\sqrt{2^{n+2}}}\sum_{i,j}\ket{i_{A},j_{B},(i\oplus j)_{C}}\sum_{r}\ket{r}\Pi^{(r)}_{1,j}\Pi^{(r)}_{0,i}\ket{\psi}\ket{0^{\otimes {t}}}
+% \end{align}
+
+% % TODO: these are just my thoughts
+% We can compute
+% \begin{align}
+%     \ket{\phi} &= \frac{1}{\sqrt{2^{n+2}}}\sum_{i,j}\sum_{r}(-1)^{i\oplus j}\ket{r}\Pi^{(r)}_{1,j}\Pi^{(r)}_{0,i}\ket{\psi}\ket{0^{\otimes {t}}}
+% \end{align}
+
+% On the other hand we can compute
+% \begin{align}
+%     \ket{\phi} &= \frac{1}{\sqrt{2^{n}}}(-1)^{r\cdot (x_{0}\oplus x_{1})}\ket{r}\ket{\psi}\ket{0^{\otimes {t}}}
+% \end{align}
+
+% The state is "close" to the state
+% \begin{align}
+%     \ket{\phi} &= \ket{x_{0}\oplus x_{1}}\ket{\psi}\ket{0^{\otimes {t}}}
+% \end{align}
+
+% On the rest of the qubits we apply
+% \begin{align}
+%     \ket{\phi} &= \left(\sum_{x:x\cdot (x_{0}\oplus x_{1}) = 0}\ket{x}\right)\ket{\psi}\ket{0^{\otimes a}} \ket{x_{0}\oplus x_{1}}U \ket{x_{0}\oplus x_{1}}\ket{0^{\otimes {r}}}
+% \end{align}
+% On which we can apply QGL again... (?) and using that it is a unitary and close vectors remain close or something like that we obtain $\ket{x_{0}}$ or $\ket{x_{1}}$ with high probability together with $\ket{x_{0}\oplus x_{1}}$. Great!
+
+% we wish to calculate the bias for the XOR experiment
+% \begin{align}\label{xorexperiment}\bra{\tilde{\psi}}\left(\sum_{r,d}(-1)^{\hat{c}_{0}(r,d)}(-1)^{\hat{c}_{1}(r,d)} \ket{r}\bra{r}\otimes  (\Pi_{0,0}^{(r,d)} -  \Pi_{0,1}^{(r,d)})(\Pi_{1,0}^{(r,d)} -  \Pi_{1,1}^{(r,d)})(\Pi_{1,0}^{(r,d)} -  \Pi_{1,1}^{(r,d)})(\Pi_{0,0}^{(r,d)} -  \Pi_{0,1}^{(r,d)})\right) \ket{\tilde{\psi}}\end{align}
+
+% We define $A_{r,d}=\Pi_{0,0}^{(r,d)} -  \Pi_{0,1}^{(r,d)}$ and $B=\Pi_{1,0}^{(r,d)} -  \Pi_{1,1}^{(r,d)}$. If $S_{i}=\mathrm{span}(\ket{s_{i}})$, then $\{A_{r,d},B_{r,d}\}\ket{s_{i}}=0$. Otherwise, $S_{i}=\mathrm{span}(\ket{a_{i}}, \ket{b_{i}})$.\\
+% Let $\ket{\tilde{\psi}}=\sum_{r,d}\sum_{i}{\alpha_{r,d,i}\ket{s_{r,d,i}} + \beta_{r,d,i} \ket{a_{r,d,i}} + \gamma_{r,d,i}\ket{b_{r,d,i}}}$, let $A\ket{s_{r,d,i}}=\lambda_{r,d,i}\ket{s_{i}}$ and $B\ket{s_{i}}=\eta_{i,r,d}\ket{s_{i}}$. To simplify the notation, we will not write the indices and they will be implied implicitly. Combining with equation \ref{zeroexperiment},
+% \begin{align}\sum_{r,d}(-1)^{\hat{c}_{0}(r,d)}\bra{\tilde{\psi}}A_{r,d}\ket{\tilde{\psi}}=\sum_{i}(-1)^{\hat{c_{0}}(r,d)}\left(\lambda_{i}|\alpha_{i}|^{2}+|\beta_{i}|^{2}-|\gamma_{i}|^{2}\right)\end{align}
+% Together with equation \ref{oneexperiment},
+% \begin{align}\sum_{r,d}(-1)^{\hat{c}_{1}(r,d)}\bra{\tilde{\psi}}B_{r,d}\ket{\tilde{\psi}}=\sum_{i}(-1)^{\hat{c}_{1}(r,d)}\left(\eta_{i}|\alpha_{i}|^{2}+(|\beta_{i}|^{2}-|\gamma_{i}|^{2})\cos\theta_{i}+(\beta_{i}^{*}\gamma_{i} + \gamma_{i}\beta_{i}^{*})\sin\theta_{i}\right)\end{align} Let $p_{0,0}$ and $p_{0,1}$ be the probabilities that $c_{0}(r,d)=\hat{c}_{0}(r,d)$ and $c_{0}(r,d)\neq \hat{c}_{0}(r,d)$ accordingly. Then, 
+% $$
+% \sum_{i}(-1)^{\hat{c}_{0}(r,d)}\left(\lambda_{i}|\alpha_{i}|^{2}+|\beta_{i}|^{2}-|\gamma_{i}|^{2}\right) = p_{0,0}-p_{0,1}=2p_{0,0}-1
+% $$
+% In the same, manner let $p_{1,0}$ and $p_{1,1}$ be the probabilities that $c_{1}(r,d)=\hat{c}_{1}(r,d)$ and $c_{1}(r,d)\neq \hat{c}_{1}(r,d)$ accordingly. Then,
+% $$
+% \sum_{i}(-1)^{\hat{c}_{1}(r,d)}\left(\eta_{i}|\alpha_{i}|^{2}+(|\beta_{i}|^{2}-|\gamma_{i}|^{2})\cos(\theta_{i})\right) = p_{1,0}-p_{1,1}=2p_{1,0}-1
+% $$ Assume the prover passes the protocol with probability $\frac{3}{4}+\epsilon$, we have
+% \begin{align}\frac{1}{2}(p_{0,0}+p_{1,0})\geq \frac{3}{4}+\epsilon\end{align} Thus,
+% $$
+% \sum_{i}\left((-1)^{\hat{c}_{0}(r,d)}\lambda_{i}+(-1)^{\hat{c}_{1}(r,d)}\eta_{i}\right)|\alpha_{i}|^{2}+\left(|\beta_{i}|^{2}-|\gamma_{i}|^{2}\right)\left((-1)^{\hat{c}_{0}(r,d)}+(-1)^{\hat{c}_{1}(r,d)}\cos(\theta_{i})\right)\geq 1+4\epsilon
+% $$
+% whereas for the XOR experiment we have
+% \begin{align}
+% &\sum_{r,d}(-1)^{\hat{c}_{0}(r,d)}(-1)^{\hat{c}_{1}(r,d)}\bra{\tilde{\psi}}A^{\dagger}_{r,d}B^{\dagger}_{r,d}B_{r,d}A_{r,d}\ket{\tilde{\psi}}\\
+% &= \sum_{i}(-1)^{\hat{c}_{0}(r,d)}(-1)^{\hat{c}_{1}(r,d)}\left\{\lambda_{i}\eta_{i}|\alpha_{i}|^{2} + (|\beta_{i}|^{2}+|\gamma_{i}|^{2})\cos(\theta_{i})+(\beta_{i}^{*}\gamma_{i} - \beta_{i}\gamma_{i}^{*})\sin(\theta_{i})\right\}
+% \end{align}
+
+
+% \section{If d is quantum}
+% \begin{thm}
+% \label{d or c are quantum}
+% Assume that an adversary $\mathcal{A}$ can cause the verifier to accept with probability $\frac{3}{4}+\mu(n)$ for some non-negligible $\mu$, then $d$ or $c$ must be obtained through quantum measurements.
+% \end{thm}
+% \textbf{Proof of theorem \ref{d or c are quantum}.} Assume the contrary, then $d$ and $c$ can be viewed as a classical (random) algorithms. If any of $d$ or $c$ are probabilistic algorithm, then generate a random tape for each probabilistic algorithm and run it fixed to the random coins in the random tape. By remark \ref{generaldalgorithm}, there exists an $m\in\{-1,1\}$ such that $\tilde{\mathcal{B}}_{m}$ returns $(y,(-1)^{r\cdot x_{0}})$ with probability greater than or equal to $\frac{1}{2}+\mu(n)$, using the same quantum circuit $U_{\mathrm{IP},m}$ as defined in theorem \ref{dequalszero}, we can obtain either $x_{0}$ or $x_{1}$ with probability $4\mu(n)^{2}$. Assume w.l.o.g., we obtain $x_{0}$. As the auxiliary quantum state is unchanged, we can rewind the circuit 
+% to stage 5. 
+% \begin{align}\Pr[(-1)^{d\cdot (x_{0}\oplus x_{1})}=m\cdot (-1)^{r\cdot x_{0}}] = \Pr[r\cdot (x_{0}\oplus x_{1}) = 0 \text{ and }(-1)^{r\cdot x_{0}} = m\cdot (-1)^{d\cdot (x_{0}\oplus x_{1})}]\leq \frac{1}{4}\end{align}
+% Therefore, $\Pr[c(r,x_{0},x_{1},d,m)\neq (-1)^{r\cdot x_{0}}]$
+
+% \section{The single-player CHSH game} 
+% \begin{definition}
+% (The $\mathrm{CHSH^{*}}$ game) in this game a player is given $\ket{\psi(k)}=\cos\left(\frac{k \pi}{4}\right)\ket{0}+\sin\left(\frac{k\pi}{4}\right)\ket{1}$, where $k \in \left\{-1, 0, 1, 2\right\}$ chosen uniformly at random. In other words, $\ket{\psi(k)}\in\left\{\ket{-},\ket{0},\ket{+},\ket{1}\right\}$ and $m\in\left\{-1, +1\right\}$ chosen uniformly at random. The player returns an outcome $c\in\left\{-1,1\right\}$ and wins if $c=\mathcal{C}_{m}(k)$, where
+% \begin{align}\mathcal{C}_{m}(k) = \cos\left(\frac{mk\pi}{2}\right) + \sin\left(\frac{mk\pi}{2}\right)\end{align} 
+% \end{definition}
+
+% \begin{thm}
+% \label{chshstar}
+% The optimal Quantum player can succeed in the $\mathrm{CHSH^{*}}$ game with success rate of $\frac{1}{2}+\frac{\sqrt{2}}{2}\approx 0.85$.
+% \end{thm} \textbf{Proof of theorem \ref{chshstar}} The general Quantum player performs measurement in the basis \begin{align}B_{m}=\left\{\cos(\theta_{m})\ket{0}+\sin(\theta_{m})\ket{1},  -\sin(\theta_{m})\ket{0}+\cos(\theta_{m})\ket{1}\right\}\end{align}  and output $1$ if it measures $0$ and outputs $-1$ if it measures $1$.
+% Let's denote the output of his measurement on $\ket{\psi(k)}$ as $\mathcal{A}_{m}(k)$. The probabilites to measure each outcome are
+% \begin{align}
+%     \mathrm{Pr}\left[\mathcal{A}_{m}(k) = 1\right]& = \cos^2\left(\theta_{m} - \frac{k\pi}{4}\right)\\
+%     \mathrm{Pr}\left[\mathcal{A}_{m}(k) = -1\right]& =\sin^2\left(\theta_{m} - \frac{k\pi}{4}\right)\\
+% \end{align} We will analyze the case $m=1$
+%     $$\mathrm{Pr}[\mathcal{A}_{1}(k)=\mathcal{C}_{1}(k)] =  
+% \frac{1}{4}\sum_{k=-1}^{3}{\mathrm{Pr}\left[\mathcal{A}_{1}(k)=\cos\left(\frac{k\pi}{2}\right) + \sin\left(\frac{k\pi}{2}\right)\right]}$$
+% For $k=0$ and $k=2$,
+% \begin{align}\mathrm{Pr}\left[\mathcal{A}_{1}(0) = 1 \right] + \mathrm{Pr}\left[\mathcal{A}_{1}(2) = -1 \right] = \cos^{2}\left(\theta_{1}\right) + \sin^{2}\left(\theta_{1} - \frac{\pi}{2}\right) = 2\cos^2(\theta_{1})\end{align}  For $k=-1$ and $k=1$,
+% \begin{align}\mathrm{Pr}\left[\mathcal{A}_{1}(-1) = -1 \right] + \mathrm{Pr}\left[\mathcal{A}_{1}(1) = 1 \right] = \sin^{2}\left(\theta_{1} + \frac{\pi}{4}\right) + \cos^{2}\left(\theta_{1} - \frac{\pi}{4}\right) = 1 + 2\sin\left(\theta_{1}\right)\cos\left(\theta_{1}\right)\end{align}The total success rate for $m=1$ is \begin{align}\mathrm{Pr}[\mathcal{A}_{1}(k)=\mathcal{C}_{1}(k)] = \cos^{2}(\theta_{1}) + \sin(\theta_{1})\cos(\theta_{1})+ \frac{1}{4} = \frac{\cos(2\theta_{1}) + \sin(2\theta_{1})}{2} + \frac{1}{2}\leq \frac{1}{2} + \frac{\sqrt{2}}{2}\end{align} 
+% The maximum is obtained for $\theta_{1} = \frac{\pi}{8}$. For $m=-1$, the case for $k=0$ and $k=2$ is identical. For $k=-1$ and $k=2$, \begin{align}\mathrm{Pr}\left[\mathcal{A}_{-1}(-1) = 1 \right] + \mathrm{Pr}\left[\mathcal{A}_{-1}(1) = -1 \right] = \cos^{2}\left(\theta_{-1} + \frac{\pi}{4}\right) + \sin^{2}\left(\theta_{-1} - \frac{\pi}{4}\right) = 1 - 2\sin\left(\theta_{-1}\right)\cos\left(\theta_{-1}\right)\end{align} The total success rate for $m=-1$ is \begin{align}\mathrm{Pr}[\mathcal{A}_{-1}(k)=\mathcal{C}_{-1}(k)] = \cos^{2}(\theta_{-1}) - \sin(\theta_{-1})\cos(\theta_{-1})+ \frac{1}{4} = \frac{\cos(2\theta_{-1}) - \sin(2\theta_{-1})}{2} + \frac{1}{2}\leq \frac{1}{2} + \frac{\sqrt{2}}{2}\end{align} 
+% The maximum is obtained for $\theta_{-1} = -\frac{\pi}{8}$. Therefore, the optimal strategy is to measure the qubit $\ket{\psi}$ in the rotated basis: \begin{align}\left\{\cos\left(\frac{m\pi}{8}\right)\ket{0}+\sin\left(\frac{m\pi}{8}\right)\ket{1}\right\}\end{align}  This strategy achieves a success rate of $\frac{1}{2} + \frac{\sqrt{2}}{2}$.
+\printbibliography
+
+\end{document}
